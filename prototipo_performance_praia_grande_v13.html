@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Performance Praia Grande v13</title>
+<style>
+:root{
+  --bg:#f3f6f5;--card:#fff;--ink:#17231f;--muted:#6b7a74;--green:#1f6d4b;--green2:#5ca878;
+  --amber:#bb8420;--red:#a94a45;--red2:#7f2f2c;--border:#dde6e2;--navy:#17362c;--slate:#53635d;
+  --blue:#3d6d86;--shadow:0 7px 20px #1d30280c
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--ink)}
+header{background:linear-gradient(120deg,var(--navy),#275f4c);color:#fff;padding:22px 28px 16px;position:sticky;top:0;z-index:10;box-shadow:0 5px 18px #10251d22}
+h1{margin:0;font-size:22px} header p{margin:4px 0 0;color:#d8e8e1;font-size:13px}
+.tabs{display:flex;gap:8px;margin-top:16px;overflow:auto}.tab{border:1px solid #ffffff2d;background:#ffffff12;color:#fff;padding:9px 12px;border-radius:9px;cursor:pointer;white-space:nowrap}.tab.active{background:#fff;color:var(--navy);font-weight:700}
+main{max-width:1480px;margin:auto;padding:22px}.panel{display:none}.panel.active{display:block}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:15px;box-shadow:var(--shadow)}
+small,.desc{color:var(--muted);font-size:12px}.v{font-size:25px;font-weight:760;margin-top:5px}.good{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+.grid2{display:grid;grid-template-columns:1.65fr 1fr;gap:14px;margin-bottom:14px}h2{font-size:16px;margin:0 0 4px}h3{font-size:14px;margin:0 0 8px}
+canvas{width:100%;height:330px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 10px;border-bottom:1px solid #e9efec;text-align:right}th{background:#eef3f1;position:sticky;top:0}th:first-child,td:first-child{text-align:left}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:750;white-space:nowrap}.real{background:#e3f3e9;color:#276c49}.proj{background:#fff0c8;color:#7d5a0a}.partial{background:#fff0d8;color:#8a5e0e}.neutral{background:#e9efec;color:#53635d}.crit{background:#f7e3e1;color:#8b342f}.high{background:#fdebd7;color:#9b5b11}.ok{background:#e3f3e9;color:#276c49}.info{background:#e8f0f4;color:#3d6d86}
+.note{background:#fff7df;border:1px solid #ecd591;border-radius:10px;padding:10px 12px;font-size:12px;color:#705814;margin-top:10px}.note.red{background:#f9eceb;border-color:#efc4c0;color:#7e3732}.note.green{background:#edf7f0;border-color:#cce3d3;color:#2d6b4d}
+.rule{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #edf1ef;font-size:13px}.tablewrap{overflow:auto;border:1px solid var(--border);border-radius:11px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 14px}.toolbar input,.toolbar select{border:1px solid var(--border);background:#fff;border-radius:9px;padding:9px 10px;color:var(--ink);min-height:38px}.toolbar input{min-width:260px}.toolbar .spacer{flex:1}.count{font-size:12px;color:var(--muted)}
+.press-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.metric{padding:14px;border-radius:12px;border:1px solid var(--border);background:#fff}.metric b{display:block;font-size:22px;margin-top:5px}.metric span{font-size:12px;color:var(--muted)}
+.dmcgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.dmc{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow);cursor:pointer;transition:.15s transform,.15s box-shadow}.dmc:hover{transform:translateY(-2px);box-shadow:0 12px 24px #1d302814}.dmc-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.dmc-name{font-weight:800;font-size:15px}.rank{font-size:11px;color:var(--muted);margin-top:3px}.dmc-badges{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.dmc-line{font-size:12px;line-height:1.45;margin:5px 0;color:#3c4b46}.dmc-line strong{color:var(--ink)}.spark{height:6px;border-radius:999px;background:#edf1ef;overflow:hidden;margin-top:11px}.spark i{display:block;height:100%;background:var(--red);border-radius:999px}.spark.amber i{background:var(--amber)}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:10px}.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}.dot.r{background:var(--red)}.dot.a{background:var(--amber)}.dot.g{background:var(--green)}.dot.n{background:#aab5b1}
+.drawer-back{position:fixed;inset:0;background:#0f211a66;display:none;z-index:30}.drawer-back.open{display:block}.drawer{position:absolute;right:0;top:0;height:100%;width:min(620px,95vw);background:#f7faf8;padding:22px;overflow:auto;box-shadow:-12px 0 35px #0d1e1740}.drawer-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}.close{border:1px solid var(--border);background:#fff;border-radius:9px;padding:7px 10px;cursor:pointer;font-size:18px}.detail-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:13px;margin-top:11px}.detail-row{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:8px 0;border-bottom:1px solid #edf1ef;font-size:12px}.detail-row:last-child{border:0}.detail-row span{color:var(--muted)}.detail-row strong{line-height:1.4}.callout{border-left:4px solid var(--amber);background:#fff8e8;padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5;margin-top:11px}.callout.red{border-color:var(--red);background:#fbefee}.callout.blue{border-color:var(--blue);background:#eef5f8}
+.barlist{display:grid;gap:8px;margin-top:10px}.barrow{display:grid;grid-template-columns:130px 1fr 40px;gap:8px;align-items:center;font-size:12px}.bar{height:8px;border-radius:999px;background:#edf1ef;overflow:hidden}.bar span{display:block;height:100%;border-radius:999px;background:var(--red)}
+.section-title{display:flex;align-items:end;justify-content:space-between;gap:10px;margin-bottom:8px}.section-title p{margin:0;color:var(--muted);font-size:12px}
+
+
+.performance-footer{
+  margin-top:34px;
+  background:#0f5f58;
+  color:#fff;
+  padding:16px 48px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  font-size:12px;
+  font-weight:500;
+  letter-spacing:.1px;
+  width:100%;
+}
+.performance-footer .footer-left{
+  text-align:left;
+  white-space:nowrap;
+}
+.performance-footer .footer-right{
+  text-align:right;
+  white-space:nowrap;
+}
+@media(max-width:1100px){
+  .performance-footer{
+    padding:14px 20px;
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .performance-footer .footer-right{
+    text-align:left;
+  }
+.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.dmcgrid{grid-template-columns:repeat(2,1fr)}.press-summary{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){main{padding:14px}header{padding:18px 14px 13px}.dmcgrid,.press-summary,.kpis{grid-template-columns:1fr}.toolbar input{min-width:100%;width:100%}.detail-row{grid-template-columns:1fr}.drawer{padding:16px}}
+</style></head>
+<body>
+<header><h1>Performance Contratual — Praia Grande</h1><p>Ciclo dez/2025 a nov/2026 · desempenho contratual + diagnóstico hidráulico dos DMCs</p>
+<div class="tabs"><button class="tab active" data-p="exec">Executivo</button><button class="tab" data-p="apur">Apuração</button><button class="tab" data-p="proj">Projeções</button><button class="tab" data-p="press">Pressões / DMCs</button></div></header>
+<main>
+<section id="exec" class="panel active">
+<div class="kpis">
+<div class="card"><small>Performance média projetada do ciclo</small><div class="v good">154,9%</div><small>sobre meta 100%</small></div>
+<div class="card"><small>Realizado dez/25–jul/26</small><div class="v good">151,2%</div><small>8 competências consolidadas</small></div>
+<div class="card"><small>Ago parcial + projeção set–nov/26</small><div class="v good">166,3%</div><small>modelo sazonal</small></div>
+<div class="card"><small>Baseline VP</small><div class="v">1,970 mi</div><small>m³/mês</small></div>
+<div class="card"><small>DMCs com diagnóstico</small><div class="v good">14 / 14</div><small>Booster Ocian analisado por logger de PC</small></div>
+</div>
+<div class="grid2">
+<div class="card"><h2>VP mensal — realizado × projetado</h2><div class="desc">Ago/26 é parcial. Set–nov/26 usam projeção sazonal normalizada.</div><canvas id="chart" width="1000" height="360"></canvas></div>
+<div class="card"><h2>Leitura executiva</h2>
+<div class="rule"><span>Meta 100%</span><strong>307.309,626 m³/mês</strong></div>
+<div class="rule"><span>Referência 120%</span><strong>368.775 m³/mês</strong></div>
+<div class="rule"><span>VP equivalente a 100%</span><strong>1.662.624 m³/mês</strong></div>
+<div class="rule"><span>VP equivalente a 120%</span><strong>1.601.159 m³/mês</strong></div>
+<div class="note green"><strong>Resultado volumétrico:</strong> o ciclo permanece acima da meta, mesmo com agosto tratado como parcial.</div>
+<div class="note red"><strong>Risco operacional:</strong> a maior fragilidade atual está na operação noturna das alimentações REDE/Xixová e na amplificação dessas quedas em diversos DMCs.</div>
+</div></div>
+</section>
+
+<section id="apur" class="panel">
+<div class="grid2"><div class="card"><h2>Apuração mensal</h2><div class="tablewrap"><table><thead><tr><th>Mês</th><th>VP</th><th>Redução</th><th>% meta</th><th>Origem</th></tr></thead><tbody id="body"></tbody></table></div></div>
+<div class="card"><h2>Regras de cálculo</h2><div class="rule"><span>Volume perdido</span><strong>VP = VD − VCM</strong></div><div class="rule"><span>Redução</span><strong>1.969.934 − VP</strong></div><div class="rule"><span>Performance</span><strong>Redução ÷ 307.309,626</strong></div><div class="note">A performance contratual é apurada para Praia Grande como um todo. Os DMCs são usados para diagnóstico operacional e direcionamento de ações, não como apuração contratual individual.</div></div></div>
+</section>
+
+<section id="proj" class="panel">
+<div class="card"><h2>Comparação de projeções</h2><div class="desc">Cenário-base recomendado: nível recente de jun–ago/26 ajustado por sazonalidade observada.</div>
+<div class="tablewrap"><table><thead><tr><th>Mês</th><th>VD recomendado</th><th>VCM recomendado</th><th>VP recomendado</th><th>% meta rec.</th><th>VP planilha atual</th><th>% meta atual</th></tr></thead><tbody>
+<tr><td><strong>set/26</strong></td><td>3.462.153</td><td>2.033.973</td><td>1.428.180</td><td><strong>176,3%</strong></td><td>1.520.463</td><td>146,3%</td></tr><tr><td><strong>out/26</strong></td><td>3.610.736</td><td>2.053.673</td><td>1.557.062</td><td><strong>134,4%</strong></td><td>1.568.304</td><td>130,7%</td></tr><tr><td><strong>nov/26</strong></td><td>3.560.379</td><td>2.168.735</td><td>1.391.644</td><td><strong>188,2%</strong></td><td>1.600.950</td><td>120,1%</td></tr>
+</tbody></table></div>
+<div class="note">O cenário atual da planilha pode permanecer como visão conservadora; o cenário sazonal normalizado entra como cenário-base de gestão.</div>
+</div></section>
+
+<section id="press" class="panel">
+<div class="press-summary">
+  <div class="metric"><span>DMCs analisados</span><b>14</b><span>de 14 cadastrados</span></div>
+  <div class="metric"><span>Criticidade muito alta</span><b class="bad">4</b><span>inclui Booster Ocian por pressão estruturalmente baixa</span></div>
+  <div class="metric"><span>Criticidade alta</span><b class="warn">10</b><span>inclui 1 com forte ressalva de sensor</span></div>
+  <div class="metric"><span>DMC sem VRP</span><b>1</b><span>Booster Ocian · análise exclusiva do logger de PC</span></div>
+</div>
+<div class="grid2">
+  <div class="card"><h2>Padrão sistêmico observado</h2><div class="desc">Leitura consolidada das séries de 15 minutos recebidas.</div>
+    <div class="barlist">
+      <div class="barrow"><span>Baixa noturna</span><div class="bar"><span style="width:100%"></span></div><strong>14</strong></div>
+      <div class="barrow"><span>Queda estruturada</span><div class="bar"><span style="width:82%"></span></div><strong>11</strong></div>
+      <div class="barrow"><span>Problema diurno</span><div class="bar"><span style="width:64%"></span></div><strong>9</strong></div>
+      <div class="barrow"><span>Limitação de vazão</span><div class="bar"><span style="width:72%"></span></div><strong>~10</strong></div>
+    </div>
+    <div class="note red">O cruzamento com as duas saídas do reservatório mostra que a recorrência noturna não é apenas fenômeno interno dos DMCs: REDE e Xixová também sofrem queda simultânea de pressão e vazão. A análise passa a separar componente sistêmico, amplificação local e falha de instrumentação.</div><div class="note"><strong>Controle metodológico:</strong> os antigos percentuais visuais de recorrência foram retirados desta versão para não serem confundidos com estatística calculada. A recorrência permanece qualitativa até o fechamento timestamp a timestamp.</div>
+  </div>
+  <div class="card"><h2>Critérios de pressão do PC</h2>
+    <div class="rule"><span>Normal</span><strong class="good">10 a 50 mca</strong></div>
+    <div class="rule"><span>Baixa pressão</span><strong class="warn">3,2 a &lt;10 mca</strong></div>
+    <div class="rule"><span>Crítica</span><strong class="bad">&lt;3,2 mca</strong></div>
+    <div class="rule"><span>Sobrepressão</span><strong class="bad">&gt;50 mca</strong></div>
+    <div class="rule"><span>Janela noturna</span><strong>23:00–05:00</strong></div>
+    <div class="rule"><span>Janela crítica</span><strong>23:15–04:45</strong></div>
+    <div class="note">Os limites são aplicados ao PC. Pressões de montante e jusante servem para diagnóstico hidráulico e validação do comportamento, não recebem automaticamente o mesmo semáforo.</div>
+  </div>
+</div>
+
+<div class="grid2" style="margin-top:16px">
+  <div class="card"><h2>Alimentação — REDE</h2><div class="desc">Saída do reservatório que abastece 8 DMCs.</div>
+    <div class="rule"><span>DMCs vinculados</span><strong>8</strong></div>
+    <div class="rule"><span>Pressão de saída</span><strong>queda noturna recorrente</strong></div>
+    <div class="rule"><span>Vazão de saída</span><strong>queda sincronizada</strong></div>
+    <div class="note red"><strong>Leitura:</strong> parte relevante das quedas noturnas dos PCs já nasce na alimentação REDE. O diagnóstico local deve medir quanto cada DMC amplifica a redução recebida.</div>
+  </div>
+  <div class="card"><h2>Alimentação — Xixová</h2><div class="desc">Saída do reservatório que abastece 6 DMCs.</div>
+    <div class="rule"><span>DMCs vinculados</span><strong>6</strong></div>
+    <div class="rule"><span>Pressão de saída</span><strong>frequentemente 3–6 mca na madrugada</strong></div>
+    <div class="rule"><span>Vazão de saída</span><strong>redução forte e recorrente</strong></div>
+    <div class="note red"><strong>Leitura:</strong> a baixa pressão noturna é parcialmente sistêmica. Há noites em que a própria saída se aproxima ou fica abaixo de 3,2 mca; portanto o PC não pode ser interpretado isoladamente.</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Hierarquia de diagnóstico</h2><div class="desc">Nova regra para classificar causa provável sem confundir alimentação, DMC e falha de instrumentação.</div>
+  <div class="rule"><span>1 · Alimentação</span><strong>Pressão + vazão da saída REDE/Xixová</strong></div>
+  <div class="rule"><span>2 · Entrada do DMC</span><strong>Montante / jusante quando disponíveis</strong></div>
+  <div class="rule"><span>3 · Ponto crítico</span><strong>PC válido</strong></div>
+  <div class="rule"><span>4 · Qualidade do dado</span><strong>falha, avaria, pré-instalação ou dado válido</strong></div>
+  <div class="note">Classificação do evento: <strong>Sistêmico</strong> quando a alimentação cai junto; <strong>Local</strong> quando a alimentação permanece adequada e o PC deteriora; <strong>Misto</strong> quando a queda da alimentação é amplificada dentro do DMC; <strong>Indeterminado</strong> quando a telemetria não permite conclusão.</div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Índice de Amplificação Local — IAL</h2><div class="desc">Método normalizado para separar a deterioração adicional do PC da queda já recebida pela alimentação, sem usar a diferença absoluta de pressão entre reservatório e DMC.</div>
+  <div class="grid2" style="margin-top:12px">
+    <div>
+      <div class="rule"><span>Referência da alimentação</span><strong>P<sub>alim,ref</sub> = mediana diurna válida</strong></div>
+      <div class="rule"><span>Referência do DMC</span><strong>P<sub>PC,ref</sub> = mediana diurna válida</strong></div>
+      <div class="rule"><span>Pressão relativa</span><strong>r = P(t) ÷ P<sub>ref</sub></strong></div>
+      <div class="rule"><span>Déficit relativo</span><strong>d = 1 − r</strong></div>
+      <div class="rule"><span>IAL por timestamp</span><strong>IAL = d<sub>PC</sub> − d<sub>alim</sub> = r<sub>alim</sub> − r<sub>PC</sub></strong></div>
+    </div>
+    <div>
+      <div class="note green"><strong>IAL próximo de zero:</strong> PC preserva aproximadamente a mesma fração de pressão da alimentação; predominância sistêmica.</div>
+      <div class="note"><strong>IAL positivo:</strong> o PC perde proporcionalmente mais que a alimentação; existe amplificação local.</div>
+      <div class="note red"><strong>IAL positivo com alimentação preservada:</strong> forte evidência de deterioração predominantemente local.</div>
+      <div class="note"><strong>IAL negativo:</strong> o PC preserva proporcionalmente mais pressão que a alimentação; não significa sobrepressão nem melhora absoluta.</div>
+    </div>
+  </div>
+  <div class="note"><strong>Regra de qualidade:</strong> cálculo apenas em timestamps coincidentes de 15 min e válidos. Gaps não serão interpolados. Falhas conhecidas de PC/macromedidor e períodos pré-instalação serão excluídos. O IAL será expresso em pontos percentuais de pressão relativa, não como percentual causal do problema.</div>
+    <div class="note green"><strong>Status v13:</strong> método CPE + IAL validado em Kennedy II × REDE e recorrência sistêmica quantificada em 8 dias consecutivos do Xixová. Os demais DMCs permanecem em triagem técnica até o casamento integral das séries; o painel diferencia explicitamente dado calculado de inferência operacional.</div>
+</div>
+
+
+<div class="card" style="margin-top:16px"><h2>CPE — Condição Pré-Evento</h2>
+  <div class="desc">A auditoria sincronizada mostrou que o IAL, sozinho, pode mascarar um DMC que já chega à transição com pressão baixa. Por isso, cada evento passa a ter duas leituras complementares: condição imediatamente anterior à perturbação e amplificação durante a perturbação.</div>
+  <div class="grid2" style="margin-top:12px">
+    <div>
+      <div class="rule"><span>CPE adequada</span><strong>PC ≥ 10 mca antes da queda da alimentação</strong></div>
+      <div class="rule"><span>CPE baixa</span><strong>3,2 ≤ PC &lt; 10 mca</strong></div>
+      <div class="rule"><span>CPE crítica</span><strong>PC &lt; 3,2 mca</strong></div>
+    </div>
+    <div>
+      <div class="note green"><strong>CPE responde:</strong> o DMC já estava ruim antes do evento sistêmico?</div>
+      <div class="note"><strong>IAL responde:</strong> durante a queda, o PC perdeu proporcionalmente mais pressão do que a alimentação?</div>
+      <div class="note red"><strong>Regra combinada:</strong> CPE baixa/crítica + IAL próximo de zero ou negativo não absolve o DMC; significa que havia déficit local pré-existente e a queda seguinte foi predominantemente sistêmica.</div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Auditoria sincronizada — transição de 01/11/2025</h2>
+  <div class="desc">Primeira comparação padronizada em um mesmo evento. O objetivo não é fechar o mês, e sim validar a metodologia CPE + IAL com timestamps coincidentes.</div>
+
+  <div class="note"><strong>REDE:</strong> entre 00:15 e 00:30, a pressão de alimentação caiu de 25,08 para 3,27 mca — preservação de apenas <strong>13,0%</strong> do patamar pré-evento.</div>
+  <div class="tablewrap" style="margin-top:10px"><table>
+    <thead><tr><th>DMC</th><th>PC 00:15</th><th>CPE</th><th>PC 00:30</th><th>PC preservado</th><th>IAL transição</th><th>Leitura</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Diamantino</strong></td><td>3,83</td><td><span class="pill high">Baixa</span></td><td>1,50</td><td>39,2%</td><td>−26,1 pp</td><td>Déficit já existia; queda adicional predominantemente sistêmica.</td></tr>
+      <tr><td><strong>Aldo Coli</strong></td><td>5,58</td><td><span class="pill high">Baixa</span></td><td>0,26</td><td>4,7%</td><td><strong>+8,4 pp</strong></td><td>Misto, com amplificação local adicional na transição.</td></tr>
+      <tr><td><strong>Kennedy I</strong></td><td>2,86</td><td><span class="pill crit">Crítica</span></td><td>0,39</td><td>13,6%</td><td>−0,6 pp</td><td>PC já crítico; queda seguinte acompanha a alimentação.</td></tr>
+      <tr><td><strong>Castelo Branco II</strong></td><td>4,58</td><td><span class="pill high">Baixa</span></td><td>2,52</td><td>55,0%</td><td>−42,0 pp</td><td>PC preserva fração maior que a REDE, mas parte de condição inadequada.</td></tr>
+      <tr><td><strong>Kennedy II</strong></td><td>1,05</td><td><span class="pill crit">Crítica</span></td><td>1,05</td><td>100,0%</td><td>−87,0 pp</td><td>Evento local já estava ativo antes do colapso da REDE; IAL desta transição isolada não mede sua origem.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note red"><strong>Achado REDE:</strong> nos 5 DMCs com série comparável nesta transição, 5/5 já estavam abaixo de 10 mca antes da queda da REDE e 2/5 já estavam abaixo de 3,2 mca. Portanto, a alimentação agrava fortemente o evento, mas não explica sozinha a condição inicial desses PCs.</div>
+
+  <div class="note" style="margin-top:14px"><strong>Xixová:</strong> entre 00:15 e 00:30, a pressão caiu de 10,87 para 3,81 mca — preservação de <strong>35,1%</strong>.</div>
+  <div class="tablewrap" style="margin-top:10px"><table>
+    <thead><tr><th>DMC</th><th>PC 00:15</th><th>CPE</th><th>PC 00:30</th><th>PC preservado</th><th>IAL transição</th><th>Leitura</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Sérgio Henrique</strong></td><td>2,61</td><td><span class="pill crit">Crítica</span></td><td>1,95</td><td>74,7%</td><td>−39,7 pp</td><td>PC já crítico antes da queda do Xixová.</td></tr>
+      <tr><td><strong>Acre</strong></td><td>8,79</td><td><span class="pill high">Baixa</span></td><td>3,29</td><td>37,4%</td><td>−2,4 pp</td><td>Transição praticamente sistêmica, partindo de pressão já baixa.</td></tr>
+      <tr><td><strong>Costa e Silva</strong></td><td>4,80</td><td><span class="pill high">Baixa</span></td><td>0,75</td><td>15,6%</td><td><strong>+19,4 pp</strong></td><td>Amplificação local forte durante a queda desta transição.</td></tr>
+      <tr><td><strong>Júlio de Mesquita</strong></td><td>2,03</td><td><span class="pill crit">Crítica</span></td><td>1,05</td><td>51,7%</td><td>−16,7 pp</td><td>PC já crítico; Xixová agrava um déficit pré-existente.</td></tr>
+      <tr><td><strong>Maria do Carmo</strong></td><td>3,33</td><td><span class="pill high">Baixa</span></td><td>2,14</td><td>64,3%</td><td>−29,2 pp</td><td>Queda sistêmica dominante sobre condição pré-evento limítrofe.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note red"><strong>Achado Xixová:</strong> nos 5 DMCs comparáveis desta transição, 5/5 já estavam abaixo de 10 mca com Xixová ainda em 10,87 mca; 2/5 já estavam abaixo de 3,2 mca. Costa e Silva foi o caso com amplificação local mais evidente durante esta queda específica.</div>
+
+  <div class="note green"><strong>Consequência metodológica:</strong> o ranking definitivo não será montado apenas com IAL. Ele combinará CPE, severidade absoluta do PC, duração abaixo de 3,2/10 mca, IAL durante a perturbação e qualidade do dado.</div>
+</div>
+
+
+<div class="card" style="margin-top:16px"><h2>Recorrência sistêmica validada — Xixová · 01 a 08/11/2025</h2>
+  <div class="desc">A série bruta de pressão e vazão da saída Xixová permite validar, sem inferência, que a transição noturna é recorrente. Para os oito primeiros dias de novembro, foi comparado o patamar imediatamente anterior à transição com o primeiro patamar baixo consolidado entre 00:15 e 00:30.</div>
+  <div class="tablewrap" style="margin-top:12px"><table>
+    <thead><tr><th>Dia</th><th>Pressão antes</th><th>Pressão após</th><th>Queda P</th><th>Vazão antes</th><th>Vazão após</th><th>Queda Q</th></tr></thead>
+    <tbody>
+      <tr><td><strong>01/11</strong></td><td>10,87</td><td>3,81</td><td>−64,9%</td><td>296,53</td><td>172,35</td><td>−41,9%</td></tr>
+      <tr><td><strong>02/11</strong></td><td>15,54</td><td>3,27</td><td>−79,0%</td><td>506,35</td><td>152,15</td><td>−70,0%</td></tr>
+      <tr><td><strong>03/11</strong></td><td>8,14</td><td>4,44</td><td>−45,5%</td><td>454,56</td><td>168,50</td><td>−62,9%</td></tr>
+      <tr><td><strong>04/11</strong></td><td>19,92</td><td>4,54</td><td>−77,2%</td><td>577,23</td><td>232,97</td><td>−59,6%</td></tr>
+      <tr><td><strong>05/11</strong></td><td>11,55</td><td>5,10</td><td>−55,8%</td><td>303,73</td><td>147,93</td><td>−51,3%</td></tr>
+      <tr><td><strong>06/11</strong></td><td>13,77</td><td>4,31</td><td>−68,7%</td><td>384,63</td><td>121,18</td><td>−68,5%</td></tr>
+      <tr><td><strong>07/11</strong></td><td>17,69</td><td>5,17</td><td>−70,8%</td><td>223,22</td><td>83,88</td><td>−62,4%</td></tr>
+      <tr><td><strong>08/11</strong></td><td>18,07</td><td>5,27</td><td>−70,8%</td><td>400,82</td><td>127,80</td><td>−68,1%</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2" style="margin-top:12px">
+    <div class="note red"><strong>Recorrência:</strong> 8 de 8 dias apresentaram degrau noturno relevante em pressão e vazão.</div>
+    <div class="note"><strong>Mediana das quedas:</strong> aproximadamente <strong>69,7%</strong> em pressão e <strong>62,7%</strong> em vazão.</div>
+  </div>
+  <div class="note green"><strong>Leitura:</strong> o comportamento Xixová é uma rotina operacional/hidráulica estruturada e não um conjunto de mínimos aleatórios. A investigação de causa deve partir do comando/condição da saída e depois medir o déficit residual dos DMCs.</div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Recorrência do precursor local — Kennedy II</h2>
+  <div class="desc">Kennedy II foi usado como DMC-piloto porque a série contém PC, montante, jusante e vazão. Duas noites consecutivas mostram queda do PC antes da queda forte de montante/alimentação.</div>
+  <div class="tablewrap" style="margin-top:12px"><table>
+    <thead><tr><th>Noite</th><th>PC antes</th><th>PC precursor</th><th>Montante no precursor</th><th>Colapso a montante</th><th>Conclusão</th></tr></thead>
+    <tbody>
+      <tr><td><strong>01→02/11</strong></td><td>9,40 às 23:00</td><td>4,71 às 23:15</td><td>25,22 mca · preservado</td><td>madrugada seguinte</td><td><span class="pill crit">Local antecede sistêmico</span></td></tr>
+      <tr><td><strong>02→03/11</strong></td><td>10,49 às 23:00</td><td>8,52 às 23:15 → 4,39 às 23:30</td><td>20,36 → 20,59 mca · preservado</td><td>4,19 mca às 00:15</td><td><span class="pill crit">Local antecede sistêmico</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note red"><strong>Achado:</strong> o precursor local repetiu-se nas duas noites verificadas. Isso fortalece a hipótese de que, em Kennedy II, há uma deterioração local anterior ao degrau sistêmico — e não apenas resposta passiva à queda da REDE.</div>
+  <div class="note">O resultado continua sendo diagnóstico, não atribuição automática de causa a uma VRP específica. A confirmação operacional exige confrontar horários de comando, setpoints, posição de válvulas e eventuais manobras.</div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>IPS — Índice de Prioridade Hidráulica</h2>
+  <div class="desc">Modelo de ranking quantitativo que será calculado automaticamente quando todas as séries brutas forem processadas. O índice não mede desempenho contratual e não será usado para atribuir culpa; serve para ordenar investigação de campo.</div>
+  <div class="grid2" style="margin-top:12px">
+    <div>
+      <div class="rule"><span>Severidade absoluta do PC</span><strong>0–35 pts</strong></div>
+      <div class="rule"><span>Condição Pré-Evento — CPE</span><strong>0–20 pts</strong></div>
+      <div class="rule"><span>Amplificação local — IAL</span><strong>0–20 pts</strong></div>
+      <div class="rule"><span>Persistência / recorrência</span><strong>0–15 pts</strong></div>
+      <div class="rule"><span>Problema diurno residual</span><strong>0–10 pts</strong></div>
+    </div>
+    <div>
+      <div class="note red"><strong>80–100:</strong> prioridade muito alta</div>
+      <div class="note"><strong>60–79:</strong> prioridade alta</div>
+      <div class="note"><strong>40–59:</strong> prioridade moderada</div>
+      <div class="note green"><strong>&lt;40:</strong> prioridade menor, mantendo monitoramento</div>
+      <div class="note"><strong>Confiabilidade do dado ficará fora do IPS.</strong> Ela será exibida como selo separado — Boa / Parcial / Baixa — para não transformar ausência de telemetria em aparente melhora hidráulica.</div>
+    </div>
+  </div>
+  <div class="note"><strong>Regra essencial:</strong> períodos em que a alimentação já está baixa não pontuam automaticamente como amplificação local. O IPS valoriza principalmente déficit pré-evento, persistência após recuperação da alimentação e IAL positivo em timestamps válidos.</div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Piloto do IAL — Kennedy II × REDE</h2><div class="desc">Validação da lógica com uma transição noturna real de 01→02/11/2025. Para este piloto foi usado 23:00 como referência imediatamente anterior ao evento: REDE = 26,04 mca e PC Kennedy II = 9,40 mca. A versão consolidada usará a mediana diurna válida.</div>
+  <div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Timestamp</th><th>REDE (mca)</th><th>PC (mca)</th><th>REDE preservada</th><th>PC preservado</th><th>IAL</th><th>Leitura</th></tr></thead><tbody>
+    <tr><td><strong>01/11 23:15</strong></td><td>26,03</td><td>4,71</td><td>100,0%</td><td>50,1%</td><td><strong>+49,9 pp</strong></td><td><span class="pill crit">Local forte</span></td></tr>
+    <tr><td><strong>02/11 00:15</strong></td><td>2,87</td><td>0,32</td><td>11,0%</td><td>3,4%</td><td><strong>+7,6 pp</strong></td><td><span class="pill high">Misto / sistêmico dominante</span></td></tr>
+    <tr><td><strong>02/11 02:00</strong></td><td>3,59</td><td>1,44</td><td>13,8%</td><td>15,3%</td><td><strong>−1,5 pp</strong></td><td><span class="pill ok">Predom. sistêmico</span></td></tr>
+    <tr><td><strong>02/11 04:15</strong></td><td>4,77</td><td>2,63</td><td>18,3%</td><td>28,0%</td><td><strong>−9,7 pp</strong></td><td><span class="pill ok">Predom. sistêmico</span></td></tr>
+    <tr><td><strong>02/11 04:30</strong></td><td>12,90</td><td>6,21</td><td>49,5%</td><td>66,1%</td><td><strong>−16,5 pp</strong></td><td><span class="pill ok">Recuperação sistêmica</span></td></tr>
+  </tbody></table></div>
+  <div class="note red"><strong>Achado do piloto:</strong> Kennedy II começa a deteriorar antes da queda da própria REDE. Às 23:15 a alimentação permanece praticamente igual ao patamar das 23:00, enquanto o PC já perde cerca de metade da sua pressão de referência. Depois que a REDE colapsa, boa parte da baixa pressão passa a ser explicada pelo componente sistêmico.</div>
+  <div class="note"><strong>Interpretação correta:</strong> a mesma madrugada pode mudar de classe ao longo do tempo — primeiro local, depois mista/sistêmica. Portanto o ranking final será construído pela distribuição dos eventos válidos, e não por um único mínimo ou por uma única classe por noite.</div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Leitura causal do sistema — prioridade em duas escalas</h2>
+  <div class="desc">A partir do cruzamento das duas saídas do reservatório com os PCs, a investigação deixa de começar pela VRP de cada DMC e passa a começar pela origem da perturbação.</div>
+  <div class="grid2" style="margin-top:12px">
+    <div>
+      <div class="note red"><strong>Nível 1 · Alimentação:</strong> REDE e Xixová apresentam reduções noturnas estruturadas de pressão acompanhadas por redução de vazão. Antes de atribuir a causa ao DMC, deve-se verificar a rotina operacional do reservatório/saídas e os horários de transição.</div>
+      <div class="rule"><span>Janela de maior interesse</span><strong>aprox. 00:15 → 04:15/04:30</strong></div>
+      <div class="rule"><span>Sinal que reforça origem sistêmica</span><strong>queda simultânea em saída + vários PCs</strong></div>
+      <div class="rule"><span>Sinal que enfraquece origem sistêmica</span><strong>saída preservada + PC em queda</strong></div>
+    </div>
+    <div>
+      <div class="note"><strong>Nível 2 · DMC:</strong> depois de descontar o comportamento da alimentação, o IAL mede o déficit residual do PC. Montante/jusante e condição da instrumentação entram como evidência de apoio.</div>
+      <div class="rule"><span>Local forte</span><strong>PC deteriora com alimentação preservada</strong></div>
+      <div class="rule"><span>Misto</span><strong>alimentação cai e PC amplifica</strong></div>
+      <div class="rule"><span>Sistêmico dominante</span><strong>PC acompanha queda relativa da saída</strong></div>
+      <div class="rule"><span>Indeterminado</span><strong>sensor/macro impede conclusão</strong></div>
+    </div>
+  </div>
+  <div class="note"><strong>Implicação operacional:</strong> ajustes de VRP devem ser avaliados depois de entender a rotina das saídas REDE/Xixová. Caso contrário, corre-se o risco de corrigir localmente um sintoma cuja parcela dominante nasce a montante.</div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Ranking técnico revisado — pós-alimentação</h2>
+  <div class="desc">Prioridade de investigação, não ranking contratual. Considera criticidade hidráulica, ocorrência fora da madrugada, evidência de amplificação local e confiabilidade do dado.</div>
+  <div class="tablewrap" style="margin-top:12px"><table>
+    <thead><tr><th>Faixa</th><th>DMCs</th><th>Motivo principal</th><th>Próxima ação</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill crit">P1</span></td><td><strong>Diamantino · Castelo Branco I · Sérgio Henrique · Booster Ocian · Aldo Coli</strong></td><td>Há evidência de déficit local relevante além da queda recebida pela alimentação.</td><td>Calcular IAL horário, revisar eventos diurnos e validar montante/jusante onde houver.</td></tr>
+      <tr><td><span class="pill high">P2</span></td><td><strong>Kennedy II · Castelo Branco II · Kennedy I · Maria do Carmo · Júlio de Mesquita</strong></td><td>Baixa severa, porém com forte componente sistêmico noturno. Alguns eventos sugerem amplificação local.</td><td>Separar cada madrugada em trechos local → misto → sistêmico, como no piloto Kennedy II.</td></tr>
+      <tr><td><span class="pill partial">P3</span></td><td><strong>Acre · Oceânica Amabile</strong></td><td>Componente sistêmico tende a pesar mais ou há quebra estrutural de instrumentação/implantação.</td><td>Priorizar comparação de períodos válidos e marcos operacionais.</td></tr>
+      <tr><td><span class="pill neutral">Dados</span></td><td><strong>Costa e Silva · Roberto Vinhas</strong></td><td>Falhas do PC impedem um IAL confiável em parte da série.</td><td>Expurgar indisponibilidades antes de qualquer ordenação hidráulica.</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Amplificação local — triagem atual</h2><div class="desc">Classificação técnica preliminar do componente residual após considerar REDE/Xixová. Não é percentual contratual nem coeficiente definitivo.</div>
+  <div class="tablewrap"><table><thead><tr><th>DMC</th><th>Alimentação</th><th>Amplificação local</th><th>Leitura operacional</th></tr></thead><tbody>
+    <tr><td><strong>Diamantino</strong></td><td>REDE</td><td><span class="pill crit">Forte</span></td><td>Há déficit relevante também fora da queda noturna da alimentação.</td></tr>
+    <tr><td><strong>Castelo Branco I</strong></td><td>REDE</td><td><span class="pill crit">Forte</span></td><td>Baixa pressão persiste além do efeito sistêmico; vazão pós-fev/26 não entra no cálculo.</td></tr>
+    <tr><td><strong>Sérgio Henrique</strong></td><td>Xixová</td><td><span class="pill crit">Forte</span></td><td>Nov/25 apresentou baixa pressão inclusive com Xixová em patamar diurno superior.</td></tr>
+    <tr><td><strong>Booster Ocian</strong></td><td>Xixová</td><td><span class="pill crit">Forte</span></td><td>Sem VRP; logger indica pressão estruturalmente baixa também fora das madrugadas críticas.</td></tr>
+    <tr><td><strong>Aldo Coli</strong></td><td>REDE</td><td><span class="pill high">Moderada/Forte</span></td><td>Queda noturna é parcialmente sistêmica, mas há eventos locais e baixa pressão diurna.</td></tr>
+    <tr><td><strong>Maria do Carmo</strong></td><td>Xixová</td><td><span class="pill high">Moderada</span></td><td>Alguns eventos mostram montante preservada e colapso em jusante/PC.</td></tr>
+    <tr><td><strong>Júlio de Mesquita</strong></td><td>Xixová</td><td><span class="pill high">Moderada</span></td><td>Pressão local permanece baixa em períodos nos quais a alimentação não está no pior patamar.</td></tr>
+    <tr><td><strong>Castelo Branco II</strong></td><td>REDE</td><td><span class="pill high">Moderada</span></td><td>Forte sincronismo com REDE; precisa medir quanto a VRP/rede interna amplia a queda.</td></tr>
+    <tr><td><strong>Kennedy I</strong></td><td>REDE</td><td><span class="pill high">Moderada</span></td><td>Padrão acompanha a alimentação, com amplificação local provável em parte das noites.</td></tr>
+    <tr><td><strong>Kennedy II</strong></td><td>REDE</td><td><span class="pill high">Moderada</span></td><td>Grande contraste dia/noite e forte sincronismo com REDE; componente local ainda relevante.</td></tr>
+    <tr><td><strong>Acre</strong></td><td>Xixová</td><td><span class="pill partial">Baixa/Moderada</span></td><td>Condição diurna costuma ser melhor; peso sistêmico noturno tende a ser maior.</td></tr>
+    <tr><td><strong>Oceânica Amabile</strong></td><td>REDE</td><td><span class="pill partial">A confirmar</span></td><td>Separar obrigatoriamente pré e pós-instalação de VRP/macromedição.</td></tr>
+    <tr><td><strong>Costa e Silva</strong></td><td>Xixová</td><td><span class="pill neutral">Indeterminada</span></td><td>Falhas específicas do PC impedem usar todos os zeros no cálculo.</td></tr>
+    <tr><td><strong>Roberto Vinhas</strong></td><td>REDE</td><td><span class="pill neutral">Indeterminada</span></td><td>PC apresenta períodos de indisponibilidade; expurgo deve preceder qualquer índice.</td></tr>
+  </tbody></table></div>
+</div>
+
+<div class="card" style="margin-top:16px"><h2>Matriz evento × evento — avanço da consolidação</h2>
+  <div class="desc">Etapa seguinte do diagnóstico: cada madrugada será segmentada por timestamp de 15 minutos e classificada com CPE + IAL como Local, Mista, Sistêmica ou Indeterminada. A matriz final só contabilizará registros válidos e coincidentes entre alimentação e PC.</div>
+  <div class="tablewrap" style="margin-top:12px"><table>
+    <thead><tr><th>DMC</th><th>Alimentação</th><th>Status</th><th>Tratamento antes do IAL</th><th>Saída quantitativa prevista</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Kennedy II</strong></td><td>REDE</td><td><span class="pill ok">Piloto validado</span></td><td>Usar somente timestamps coincidentes e pressão válida.</td><td>Distribuição Local / Mista / Sistêmica por madrugada.</td></tr>
+      <tr><td><strong>Diamantino</strong></td><td>REDE</td><td><span class="pill info">Pronto para cruzamento</span></td><td>Filtrar zeros/anomalias da vazão; PC permanece utilizável.</td><td>IAL mediano noturno + horas de déficit local.</td></tr>
+      <tr><td><strong>Castelo Branco I</strong></td><td>REDE</td><td><span class="pill info">Pronto com expurgos</span></td><td>Excluir falha inicial do PC em nov/25 e toda vazão inválida após avaria do macro em fev/26.</td><td>IAL de pressão independente da vazão avariada.</td></tr>
+      <tr><td><strong>Aldo Coli</strong></td><td>REDE</td><td><span class="pill info">Pronto com expurgos</span></td><td>Retirar outliers impossíveis de vazão e blocos sem telemetria.</td><td>Separação do déficit diurno e noturno.</td></tr>
+      <tr><td><strong>Castelo Branco II</strong></td><td>REDE</td><td><span class="pill info">Pronto para cruzamento</span></td><td>Validar PM/PJ como evidência auxiliar; não aplicar semáforo do PC a esses canais.</td><td>Percentual de eventos sistêmicos versus amplificados.</td></tr>
+      <tr><td><strong>Kennedy I</strong></td><td>REDE</td><td><span class="pill info">Pronto com ressalva</span></td><td>Pressão válida; vazão de mar/26 não entra como evidência quantitativa.</td><td>IAL noturno e duração abaixo de 3,2 mca.</td></tr>
+      <tr><td><strong>Oceânica Amabile</strong></td><td>REDE</td><td><span class="pill partial">Separar períodos</span></td><td>Dividir obrigatoriamente pré e pós-implantação da VRP/macromedição.</td><td>Comparativo estrutural antes/depois.</td></tr>
+      <tr><td><strong>Roberto Vinhas</strong></td><td>REDE</td><td><span class="pill neutral">Expurgo prioritário</span></td><td>Excluir falsos zeros do PC antes de calcular qualquer IAL.</td><td>IAL somente nos blocos com PC consistente.</td></tr>
+      <tr><td><strong>Sérgio Henrique</strong></td><td>Xixová</td><td><span class="pill info">Pronto por período</span></td><td>Nov/25 sem macro instalado; pós-jan/26 avaliar telemetria normalmente.</td><td>Déficit local diurno + IAL noturno pós-instalação.</td></tr>
+      <tr><td><strong>Booster Ocian</strong></td><td>Xixová</td><td><span class="pill info">Pronto sem VRP</span></td><td>Usar apenas alimentação Xixová × logger do PC; não exigir PM/PJ ou vazão local.</td><td>IAL de pressão + mín./máx. + permanência &lt;3,2 e &lt;10 mca.</td></tr>
+      <tr><td><strong>Júlio de Mesquita</strong></td><td>Xixová</td><td><span class="pill info">Pronto com ressalva</span></td><td>Saneamento da vazão; PC pode ser usado diretamente.</td><td>Persistência local após recuperação do Xixová.</td></tr>
+      <tr><td><strong>Maria do Carmo</strong></td><td>Xixová</td><td><span class="pill info">Pronto com expurgos</span></td><td>Excluir falhas específicas do PC e gaps auxiliares.</td><td>Eventos locais corroborados por montante/jusante.</td></tr>
+      <tr><td><strong>Acre</strong></td><td>Xixová</td><td><span class="pill info">Pronto com ressalva</span></td><td>Tratar blocos zero/outliers da vazão como qualidade de dado.</td><td>Peso sistêmico noturno versus déficit residual local.</td></tr>
+      <tr><td><strong>Costa e Silva</strong></td><td>Xixová</td><td><span class="pill neutral">Expurgo prioritário</span></td><td>Excluir períodos de falha do PC antes de classificar pressão zero.</td><td>IAL apenas nos intervalos com PC confiável.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note green"><strong>Regra de fechamento:</strong> o ranking quantitativo definitivo será construído com três dimensões separadas: condição pré-evento, severidade do PC, participação sistêmica da alimentação e amplificação local residual. Isso evita penalizar um DMC por uma queda que já chega do reservatório.</div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="section-title"><div><h2>DMCs — diagnóstico consolidado</h2><p>Clique em um card para abrir o detalhamento.</p></div><span class="pill info">Base atual: séries de PC + alimentação REDE/Xixová</span></div>
+  <div class="toolbar">
+    <input id="searchDmc" placeholder="Buscar DMC ou canal PC...">
+    <select id="filterCrit"><option value="all">Todas as criticidades</option><option value="Muito alta">Muito alta</option><option value="Alta">Alta</option><option value="Não avaliado">Não avaliado</option></select>
+    <select id="filterData"><option value="all">Todos os dados</option><option value="boa">Dados bons</option><option value="parcial">Dados parciais</option><option value="ruim">Dados ruins/indisponíveis</option></select>
+    <select id="filterFeed"><option value="all">Todas as alimentações</option><option value="REDE">REDE</option><option value="Xixová">Xixová</option></select>
+    <div class="spacer"></div><div id="resultCount" class="count"></div>
+  </div>
+  <div id="dmcgrid" class="dmcgrid"></div>
+  <div class="legend"><span><i class="dot r"></i>Crítico</span><span><i class="dot a"></i>Baixo/atenção</span><span><i class="dot g"></i>Normal</span><span><i class="dot n"></i>Sem dado suficiente</span></div>
+</div>
+</section>
+</main>
+
+<div class="drawer-back" id="drawerBack"><aside class="drawer" id="drawer"><div class="drawer-top"><div><div class="rank" id="drawerRank"></div><h2 id="drawerTitle" style="font-size:21px;margin-top:4px"></h2><div id="drawerBadges" class="dmc-badges"></div></div><button class="close" id="closeDrawer">×</button></div><div id="drawerContent"></div></aside></div>
+
+
+
+<footer class="performance-footer">
+  <div class="footer-left">Performance Praia Grande - Vitalux Ecoativa</div>
+  <div class="footer-right">Desenvolvido por Lurian Hackenhaar</div>
+</footer>
+
+
+<script>
+const months=['dez/25','jan/26','fev/26','mar/26','abr/26','mai/26','jun/26','jul/26','ago/26','set/26','out/26','nov/26'];
+const vp=[1835341,1208417,1002983,1678342,1497711,1520427,1628995,1662384,1513805,1428180,1557062,1391644];
+const red=[134593,761517,966951,291592,472223,449507,340939,307550,456129,541754,412872,578290];
+const status=['Realizado','Realizado','Realizado','Realizado','Realizado','Realizado','Realizado','Realizado','Parcial','Projetado','Projetado','Projetado'];
+const base=1969934,meta=307309.626,v100=1662624.374,v120=1601159;
+
+const dmcs=[
+{nome:'Diamantino',feed:'REDE',origem:'Misto — alimentação noturna crítica + forte componente local',pc:'49950531',crit:'Muito alta',dados:'parcial',prior:1,night:98,day:'Nov/25 muito baixo; mar/26 melhora para faixas próximas/maiores que 10 mca em diversos períodos.',flow:'Nov/25 praticamente zerada. Mar/26 parcialmente utilizável, com zeros e patamares/outliers.',tele:'Auxiliares com gaps; PC utilizável para diagnóstico.',diag:'Baixa pressão noturna severa e recorrente, além de eventos críticos diurnos em nov/25. Houve melhora diurna em mar/26, sem eliminação da criticidade noturna.',acao:'Priorizar revisão da estratégia noturna e correlação PC × jusante × montante nos eventos críticos.',obs:'Transições noturnas muito estruturadas sugerem operação/controle; tratar VRP/setpoint como hipótese.'},
+{nome:'Castelo Branco I',feed:'REDE',origem:'Misto — alimentação crítica + déficit local relevante',pc:'49939160',crit:'Muito alta',dados:'ruim',prior:2,night:97,day:'Frequentemente abaixo de 10 mca, embora com recuperação em parte do dia.',flow:'Utilizável antes da avaria. Macromedidor estragou em fev/26 e não retornou; zeros posteriores = indisponível.',tele:'Pressões utilizáveis; vazão indisponível a partir de fev/26.',diag:'Baixa pressão noturna severa e recorrente, com períodos próximos de zero e condição diurna frequentemente limítrofe.',acao:'Atuar na pressão; separar completamente diagnóstico hidráulico de vazão após fev/26.',obs:'Não calcular VMN/média/correlação com vazões após a avaria do macro.'},
+{nome:'Sérgio Henrique',feed:'Xixová',origem:'Misto — alimentação crítica + baixa pressão local também diurna',pc:'49952958',crit:'Muito alta',dados:'parcial',prior:3,night:93,day:'Nov/25 muito baixo inclusive de dia; após implantação houve melhora, mas ainda há muitos períodos abaixo de 10.',flow:'Antes de meados de jan/26: macro/VRP ainda não instalados. Depois, série passa a ter valor diagnóstico.',tele:'Pré-instalação = não disponível, não falha.',diag:'Problema inicialmente generalizado, com melhora após implantação de VRP/macromedição e persistência de eventos noturnos <3,2 mca.',acao:'Comparar pré × pós-implantação e avaliar regulagem noturna da VRP.',obs:'Zeros anteriores à instalação não devem ser interpretados como vazão zero.'},
+{nome:'Kennedy II',feed:'REDE',origem:'Misto — evento inicia localmente e depois passa a sistêmico/misto no piloto validado',pc:'49952441',crit:'Alta',dados:'parcial',prior:6,night:96,day:'Mar/26 apresenta melhora clara, frequentemente 10–15 mca durante o dia.',flow:'Nov/25 majoritariamente aproveitável; mar/26 aparece zerada e precisa de validação operacional.',tele:'Montante/jusante úteis; vazão de mar/26 indisponível para correlação.',diag:'Baixa pressão noturna muito severa e cíclica, com forte contraste entre período noturno e diurno.',acao:'Excelente candidato para revisão de setpoint/controle noturno usando PC, montante e jusante.',obs:'Queda típica entre 23h–00h15 e recuperação entre 04h–05h15.'},
+{nome:'Castelo Branco II',feed:'REDE',origem:'Misto — forte sincronismo noturno com a alimentação',pc:'49945316',crit:'Alta',dados:'parcial',prior:7,night:95,day:'Pressão diurna se recupera, mas não elimina o risco noturno.',flow:'Parcial, com zeros e gaps em trechos.',tele:'Há falhas nos canais auxiliares.',diag:'Colapsos noturnos altamente estruturados, frequentemente próximos de zero, com recuperação brusca.',acao:'Investigar lógica operacional noturna/VRP/restrição a jusante.',obs:'Canal PC explicitamente confirmado pelo usuário.'},
+{nome:'Aldo Coli',feed:'REDE',origem:'Misto — alimentação crítica + componente local relevante',pc:'49951952',crit:'Alta',dados:'parcial',prior:5,night:91,day:'Nov/25 ruim; mar/26 melhora diurna, ainda com períodos abaixo de 10.',flow:'Parcial. Há zeros prolongados e outliers impossíveis em mar/26.',tele:'Pressões úteis; vazão requer saneamento.',diag:'Melhora diurna sem solução definitiva da baixa pressão noturna recorrente.',acao:'Expurgar outliers de vazão e revisar eventos noturnos persistentes.',obs:'Há eventos críticos também fora da madrugada em nov/25.'},
+{nome:'Kennedy I',feed:'REDE',origem:'Misto — alimentação noturna crítica + amplificação local a verificar',pc:'49949639',crit:'Alta',dados:'ruim',prior:8,night:95,day:'Recuperação diurna mais consistente em mar/26.',flow:'Muito comprometida/zerada na série de mar/26.',tele:'Auxiliares apresentam dropouts em alguns períodos.',diag:'Baixa pressão noturna severa, recorrente e muito estruturada, com diversos valores próximos de zero.',acao:'Avaliar operação noturna com foco em PC; não usar vazão de mar/26 como evidência de ausência de consumo.',obs:'Padrão semelhante ao Kennedy II, porém com pior disponibilidade de vazão.'},
+{nome:'Acre',feed:'Xixová',origem:'Misto — alimentação noturna crítica; componente local variável',pc:'49945776',crit:'Alta',dados:'parcial',prior:11,night:87,day:'Geralmente saudável durante o dia, frequentemente acima de 10 mca, com alguns períodos amarelos.',flow:'Mar/26 parcialmente utilizável, mas com zeros/patamares suspeitos.',tele:'Auxiliares melhoram ao longo da série; vazão exige validação.',diag:'Grande variabilidade entre noites: algumas apenas baixas, outras extremamente críticas.',acao:'Focar recorrência e duração dos eventos, não apenas pressão mínima mensal.',obs:'Instabilidade noturna mais importante que condição diurna.'},
+{nome:'Maria do Carmo',feed:'Xixová',origem:'Misto — alimentação crítica + eventos locais corroborados por jusante',pc:'49844054',crit:'Alta',dados:'parcial',prior:9,night:88,day:'Mar/26 aparenta melhora em relação a nov/25, mas continua com ocorrências amarelas.',flow:'Parcialmente utilizável; alguns trechos zerados.',tele:'Há dropouts pontuais.',diag:'Eventos noturnos reais e graves, alguns com montante ativa e forte queda a jusante/PC.',acao:'Revisar noites com colapso a jusante e separar eventos de falha de sensor.',obs:'Há indícios de melhora entre nov/25 e mar/26, sem normalização completa.'},
+{nome:'Costa e Silva',feed:'Xixová',origem:'Indeterminado em parte — alimentação crítica + falhas específicas do PC',pc:'49948374',crit:'Alta',dados:'ruim',prior:13,night:89,day:'Melhora em mar/26; várias horas diurnas na faixa normal.',flow:'Não aproveitável na série analisada.',tele:'PC apresenta períodos em zero incompatíveis com montante/jusante, indicando falha específica do sensor.',diag:'Existe baixa pressão hidráulica real, mas parte dos zeros do PC deve ser expurgada como falha de sensor.',acao:'Criar regra automática de consistência PC × montante/jusante antes de contabilizar zero como crítico.',obs:'Não usar zeros do PC cegamente.'},
+{nome:'Oceânica Amabile',feed:'REDE',origem:'Misto — alimentação crítica; comparar pré e pós-VRP',pc:'49707382',crit:'Alta',dados:'parcial',prior:12,night:90,day:'Há períodos diurnos baixos além da criticidade noturna.',flow:'Zeros anteriores à instalação da VRP/macromedidor = não disponível; pós-instalação analisar normalmente.',tele:'Separar pré e pós-instrumentação.',diag:'Pressão crítica em diversas madrugadas; avaliação de vazão só é válida após implantação dos equipamentos.',acao:'Criar marco operacional de instalação e comparar comportamento antes/depois.',obs:'VRP foi instalada em 2026; zeros anteriores não fazem parte da série válida de vazão.'},
+{nome:'Júlio de Mesquita',feed:'Xixová',origem:'Misto — alimentação crítica + pressão local persistentemente baixa',pc:'49905190',crit:'Alta',dados:'parcial',prior:10,night:86,day:'Amostras posteriores continuam frequentemente abaixo de 10 mca.',flow:'Apresenta anomalias/zeros que precisam de saneamento.',tele:'PC útil; vazão parcial.',diag:'Baixa pressão persistente, com recorrência crítica noturna observada desde nov/25.',acao:'Saneamento da vazão e análise de duração dos períodos abaixo de 10 e 3,2 mca.',obs:'Canal PC explicitamente confirmado pelo usuário.'},
+{nome:'Roberto Vinhas',feed:'REDE',origem:'Indeterminado em parte — alimentação crítica + falhas do PC',pc:'49944798',crit:'Alta',dados:'ruim',prior:14,night:72,day:'Quando o PC está funcional, condição é mais coerente; há melhora em partes da série.',flow:'Mar/26 muito comprometida/zerada.',tele:'Falha clara do PC em períodos de mar/26: PC = 0 enquanto montante/jusante permanecem normais.',diag:'Há eventos hidráulicos reais, mas a série contém falsos zeros do PC que não podem ser classificados como pressão crítica.',acao:'Expurgo automático de falha de sensor antes do ranking hidráulico.',obs:'Separar rigorosamente saúde hidráulica de confiabilidade do dado.'},
+{nome:'Booster Ocian',feed:'Xixová',origem:'Misto — alimentação Xixová crítica + condição local no PC; sem VRP',pc:'Logger Pressão 1',crit:'Muito alta',dados:'boa',prior:4,night:94,range:'0,00 a 11,27 mca (trecho validado da série)',day:'Pressão estruturalmente baixa também durante o dia: grande parte dos registros permanece abaixo de 10 mca, com episódios diurnos abaixo de 3,2 mca.',flow:'Não aplicável ao diagnóstico deste setor: não há VRP e a avaliação recebida é exclusivamente do logger de pressão no PC.',tele:'Logger de pressão disponível e utilizável; ausência de PM/PJ/vazão é característica da configuração do setor, não falha de telemetria.',diag:'Baixa pressão recorrente e generalizada no ponto crítico. Há numerosas madrugadas abaixo de 3,2 mca e episódios extremos próximos/iguais a zero; o problema também aparece fora da madrugada.',acao:'Avaliar garantia de pressão no ponto crítico ao longo de 24 h, com foco na duração abaixo de 3,2 mca e abaixo de 10 mca. Não aplicar diagnóstico de VRP/setpoint a este DMC.',obs:'Booster Ocian não possui VRP. A série deve ser tratada como monitoramento de pressão do setor por logger no PC; mínimo e máximo são indicadores centrais.'}
+];
+
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.p).classList.add('active');setTimeout(draw,30)});
+
+const body=document.getElementById('body');months.forEach((m,i)=>{const p=red[i]/meta*100;const cls=status[i]=='Realizado'?'real':status[i]=='Parcial'?'partial':'proj';body.insertAdjacentHTML('beforeend',`<tr><td><strong>${m}</strong></td><td>${vp[i].toLocaleString('pt-BR')}</td><td>${Math.round(red[i]).toLocaleString('pt-BR')}</td><td>${p.toFixed(1).replace('.',',')}%</td><td><span class="pill ${cls}">${status[i]}</span></td></tr>`)});
+
+function draw(){const c=document.getElementById('chart');if(!c)return;const x=c.getContext('2d'),W=c.width,H=c.height,p={l:75,r:20,t:25,b:55},mn=900000,mx=2050000;const X=i=>p.l+(W-p.l-p.r)*i/(months.length-1),Y=v=>p.t+(H-p.t-p.b)*(1-(v-mn)/(mx-mn));x.clearRect(0,0,W,H);x.font='12px Segoe UI';x.fillStyle='#6b7a74';x.strokeStyle='#e4ebe8';for(let j=0;j<=5;j++){let v=mn+(mx-mn)*j/5,yy=Y(v);x.beginPath();x.moveTo(p.l,yy);x.lineTo(W-p.r,yy);x.stroke();x.fillText((v/1e6).toFixed(1).replace('.',',')+' mi',10,yy+4)}months.forEach((m,i)=>x.fillText(m,X(i)-18,H-18));[[base,'#6f7b76',[5,4]],[v100,'#5ca878',[]],[v120,'#2e8e5b',[3,3]]].forEach(a=>{x.save();x.strokeStyle=a[1];x.setLineDash(a[2]);x.beginPath();x.moveTo(p.l,Y(a[0]));x.lineTo(W-p.r,Y(a[0]));x.stroke();x.restore()});function serie(start,end,color,dash){x.strokeStyle=color;x.lineWidth=3;x.setLineDash(dash);x.beginPath();for(let i=start;i<=end;i++){if(i==start)x.moveTo(X(i),Y(vp[i]));else x.lineTo(X(i),Y(vp[i]))}x.stroke();x.setLineDash([]);for(let i=start;i<=end;i++){x.beginPath();x.fillStyle=color;x.arc(X(i),Y(vp[i]),3.2,0,Math.PI*2);x.fill()}}serie(0,7,'#1f6d4b',[]);serie(7,8,'#bb8420',[3,3]);serie(8,11,'#bb8420',[6,4]);}
+
+const grid=document.getElementById('dmcgrid'),search=document.getElementById('searchDmc'),filterCrit=document.getElementById('filterCrit'),filterData=document.getElementById('filterData'),filterFeed=document.getElementById('filterFeed'),resultCount=document.getElementById('resultCount');
+function critClass(c){return c==='Muito alta'?'crit':c==='Alta'?'high':'neutral'}
+function dataText(d){return d==='boa'?'Dados bons':d==='parcial'?'Dados parciais':'Dados ruins / indisponíveis'}
+function dataClass(d){return d==='boa'?'ok':d==='parcial'?'partial':'neutral'}
+function renderDmcs(){const q=search.value.trim().toLowerCase(),fc=filterCrit.value,fd=filterData.value,ff=filterFeed.value;const arr=dmcs.filter(d=>(!q||d.nome.toLowerCase().includes(q)||d.pc.includes(q)||d.feed.toLowerCase().includes(q))&&(fc==='all'||d.crit===fc)&&(fd==='all'||d.dados===fd)&&(ff==='all'||d.feed===ff)).sort((a,b)=>a.prior-b.prior);grid.innerHTML='';arr.forEach(d=>{const card=document.createElement('article');card.className='dmc';card.innerHTML=`<div class="dmc-head"><div><div class="dmc-name">${d.nome}</div><div class="rank">${d.prior<90?'Prioridade preliminar #'+d.prior:'Sem ranking'} · PC ${d.pc}</div></div><span class="pill ${critClass(d.crit)}">${d.crit}</span></div><div class="dmc-badges"><span class="pill ${dataClass(d.dados)}">${dataText(d.dados)}</span><span class="pill info">Alimentação ${d.feed}</span>${d.night>0?`<span class="pill info">${d.night>=95?'recorrência noturna muito alta':d.night>=85?'recorrência noturna alta':'recorrência noturna com ressalvas'}</span>`:''}</div>${d.range?`<div class="dmc-line"><strong>Faixa PC:</strong> ${d.range}</div>`:''}<div class="dmc-line"><strong>Origem provável:</strong> ${d.origem}</div><div class="dmc-line"><strong>Diagnóstico:</strong> ${d.diag}</div><div class="dmc-line"><strong>Vazão:</strong> ${d.flow}</div>`;card.onclick=()=>openDrawer(d);grid.appendChild(card)});resultCount.textContent=`${arr.length} DMC${arr.length===1?'':'s'} exibido${arr.length===1?'':'s'}`}
+[search,filterCrit,filterData,filterFeed].forEach(el=>el.addEventListener(el.tagName==='INPUT'?'input':'change',renderDmcs));
+
+const drawerBack=document.getElementById('drawerBack');function openDrawer(d){document.getElementById('drawerRank').textContent=d.prior<90?`Prioridade preliminar #${d.prior}`:'Sem ranking';document.getElementById('drawerTitle').textContent=d.nome;document.getElementById('drawerBadges').innerHTML=`<span class="pill ${critClass(d.crit)}">Criticidade ${d.crit}</span><span class="pill ${dataClass(d.dados)}">${dataText(d.dados)}</span>`;document.getElementById('drawerContent').innerHTML=`<div class="detail-card"><div class="detail-row"><span>Alimentação</span><strong>${d.feed}</strong></div><div class="detail-row"><span>Origem provável</span><strong>${d.origem}</strong></div><div class="detail-row"><span>Canal PC mapeado</span><strong>${d.pc}</strong></div>${d.range?`<div class="detail-row"><span>Mín. / máx. observados</span><strong>${d.range}</strong></div>`:''}<div class="detail-row"><span>Condição noturna</span><strong>${d.diag}</strong></div><div class="detail-row"><span>Condição diurna</span><strong>${d.day}</strong></div><div class="detail-row"><span>Vazão / macro</span><strong>${d.flow}</strong></div><div class="detail-row"><span>Telemetria</span><strong>${d.tele}</strong></div></div><div class="callout red"><strong>Ação sugerida:</strong> ${d.acao}</div><div class="callout blue"><strong>Observação operacional:</strong> ${d.obs}</div>${d.night>0?`<div class="detail-card"><h3>Recorrência noturna</h3><div class="detail-row"><span>Classificação</span><strong>${d.night>=95?'Muito alta':d.night>=85?'Alta':'Com ressalvas de dados'}</strong></div><div class="desc" style="margin-top:7px">Classificação qualitativa da etapa de triagem. O percentual definitivo será calculado somente após o casamento timestamp a timestamp e os expurgos de qualidade.</div></div>`:''}`;drawerBack.classList.add('open')}
+document.getElementById('closeDrawer').onclick=()=>drawerBack.classList.remove('open');drawerBack.addEventListener('click',e=>{if(e.target===drawerBack)drawerBack.classList.remove('open')});document.addEventListener('keydown',e=>{if(e.key==='Escape')drawerBack.classList.remove('open')});
+
+renderDmcs();draw();
+</script></body></html>

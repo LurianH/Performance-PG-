@@ -1,0 +1,15 @@
+* { box-sizing: border-box; }
+html { min-width: 320px; background: var(--bg); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--bg); }
+button, input, select { font: inherit; }
+button { color: inherit; }
+h1, h2, h3, p { margin-top: 0; }
+h2 { font-size: 1.35rem; margin-bottom: 5px; }
+h3 { font-size: .92rem; margin-bottom: 8px; }
+small, .desc { color: var(--muted); font-size: .76rem; }
+.good { color: var(--green); }
+.warn { color: var(--amber); }
+.bad { color: var(--red); }
+.info-text { color: var(--blue); }
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.page-container { width: min(1480px, 100%); margin: 0 auto; padding: 22px; flex: 1; }
