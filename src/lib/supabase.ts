@@ -6,5 +6,11 @@ import { env, hasSupabaseConfiguration } from '../config/env'
  * conexão é iniciada. Nunca use uma service_role/secret key no frontend.
  */
 export const supabase = hasSupabaseConfiguration
-  ? createClient(env.supabaseUrl, env.supabasePublishableKey)
+  ? createClient(env.supabaseUrl, env.supabasePublishableKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
   : null

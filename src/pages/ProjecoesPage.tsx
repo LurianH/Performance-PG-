@@ -13,3 +13,5 @@ export function ProjecoesPage() {
     <><PageHeading title="Projeções" description="Cenários visuais separados dos dados realizados e parciais." /><MockNotice>cenário sazonal-base estático; não há motor de projeção ou premissas calculadas.</MockNotice><div className="grid-main"><Card className="wide-card"><h3>Cenário sazonal-base</h3><div className="table-wrap"><table><thead><tr><th>Mês</th><th>VD</th><th>VCM</th><th>VP</th><th>% meta</th></tr></thead><tbody>{projectionRows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={cell}>{index === 0 ? <strong>{cell}</strong> : cell}</td>)}</tr>)}</tbody></table></div></Card><Card><h3>Cenário conservador/manual</h3><div className="empty-state"><strong>Não disponível</strong><p>Nenhum valor foi inventado para preencher a ausência desse cenário.</p></div><div className="note">Premissas e histórico serão persistidos somente após a etapa de banco ser autorizada.</div></Card></div></>
   )
 }
+
+export default ProjecoesPage

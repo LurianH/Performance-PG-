@@ -28,3 +28,5 @@ export function ExecutivoPage() {
     </>
   )
 }
+
+export default ExecutivoPage

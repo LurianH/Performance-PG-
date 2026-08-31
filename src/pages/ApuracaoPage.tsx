@@ -18,3 +18,5 @@ export function ApuracaoPage() {
     </>
   )
 }
+
+export default ApuracaoPage

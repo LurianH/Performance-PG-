@@ -1,5 +1,6 @@
 import { BarChart3, Database, Droplets, Gauge, Settings, ShieldCheck } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../../features/auth/useAuth'
 
 const navigation = [
   { to: '/', label: 'Executivo', icon: BarChart3, end: true },
@@ -11,6 +12,7 @@ const navigation = [
 ]
 
 export function AppHeader() {
+  const { isMockMode, profile, signOut } = useAuth()
   return (
     <header className="app-header">
       <div className="header-inner">
@@ -18,7 +20,10 @@ export function AppHeader() {
           <h1>Performance Contratual — Praia Grande</h1>
           <p>Ciclo dez/2025 a nov/2026 · desempenho contratual + diagnóstico hidráulico dos DMCs</p>
         </div>
-        <span className="demo-label">AMBIENTE DE DEMONSTRAÇÃO</span>
+        <div className="header-account">
+          <span className="demo-label">{isMockMode ? 'AMBIENTE DE DEMONSTRAÇÃO' : profile?.role ?? 'SESSÃO ATIVA'}</span>
+          {!isMockMode && <button type="button" onClick={() => void signOut()}>Sair</button>}
+        </div>
       </div>
       <nav className="tabs" aria-label="Navegação principal">
         {navigation.map(({ to, label, icon: Icon, end }) => (
