@@ -55,7 +55,7 @@ create table public.performance_contract_parameters (
   constraint performance_contract_parameter_valid_range check (effective_to is null or effective_to >= effective_from),
   constraint performance_contract_known_numeric_positive check (
     parameter_key not in ('VP_BASELINE', 'REDUCTION_TARGET_100', 'REDUCTION_TARGET_120')
-    or numeric_value > 0
+    or (numeric_value is not null and numeric_value > 0)
   ),
   constraint performance_contract_parameter_no_overlap exclude using gist (
     parameter_key with =,

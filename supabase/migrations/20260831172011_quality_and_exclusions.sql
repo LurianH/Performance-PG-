@@ -32,9 +32,20 @@ create table public.measurement_exclusions (
   revoke_reason text,
   constraint exclusions_reason_not_blank check (btrim(reason_code) <> ''),
   constraint exclusions_justification_not_blank check (btrim(justification) <> ''),
-  constraint exclusions_target_present check (
-    measurement_id is not null
-    or (starts_at is not null and (dmc_id is not null or source_type is not null or channel_type is not null))
+  constraint exclusions_target_unambiguous check (
+    (
+      measurement_id is not null
+      and dmc_id is null
+      and source_type is null
+      and channel_type is null
+      and starts_at is null
+      and ends_at is null
+    )
+    or (
+      measurement_id is null
+      and starts_at is not null
+      and (dmc_id is not null or source_type is not null or channel_type is not null)
+    )
   ),
   constraint exclusions_valid_range check (ends_at is null or (starts_at is not null and ends_at > starts_at)),
   constraint exclusions_revocation_complete check (
