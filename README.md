@@ -1,6 +1,6 @@
 # Performance Praia Grande
 
-Fundação técnica e visual em React, TypeScript e Vite. Nesta etapa, a aplicação usa exclusivamente dados locais marcados como demonstração.
+Aplicação React, TypeScript e Vite com fundação visual, autenticação preparada e schema Supabase implantado. As telas continuam usando dados locais marcados como demonstração até a autorização das próximas etapas.
 
 ## Execução
 
@@ -16,10 +16,22 @@ npm run lint
 npm run build
 ```
 
-## Limites desta etapa
+## Configuração local do Supabase
 
-- sem banco de dados, migrations ou tabelas;
-- sem autenticação;
+Crie `.env.local` com valores do projeto correspondente:
+
+```env
+VITE_SUPABASE_URL=https://SEU_PROJECT_REF.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=SUA_CHAVE_PUBLICAVEL
+```
+
+Use somente a chave `publishable` no frontend. `.env.local` está ignorado pelo Git.
+
+## Limites atuais
+
 - sem dados oficiais;
 - sem implementação de CPE, IAL, IPS ou cálculos hidráulicos;
-- sem conexão a projeto Supabase e sem publicação na Vercel.
+- sem seed, importador ou publicação na Vercel;
+- sem primeiro ADMIN até autorização explícita e execução de `docs/BOOTSTRAP_ADMIN.md`.
+
+Consulte `docs/ETAPA_3_IMPLANTACAO_SUPABASE.md` para o registro da implantação e recuperação.

@@ -1,19 +1,21 @@
-# Supabase — ETAPA 2
+# Supabase — ETAPA 3
 
-Esta pasta foi inicializada pela CLI oficial e contém somente configuração e migrations locais.
+Esta pasta contém a configuração, as migrations versionadas e os smoke tests transacionais da primeira implantação controlada.
 
-## Estado deliberado
+## Estado atual
 
-- nenhum projeto remoto foi criado ou vinculado;
-- nenhuma migration foi aplicada local ou remotamente;
+- projeto remoto vinculado: `Performance PG` (`dklwjrwgmsqrjurvcrwu`);
+- nove migrations aplicadas em 2026-08-31;
 - nenhum seed ou dado oficial foi criado;
-- cadastro público está desabilitado;
-- tabelas novas não são expostas automaticamente;
+- a configuração local declara cadastro público desabilitado;
+- a configuração local declara tabelas novas não expostas automaticamente;
 - `anon` não recebe acesso aos dados operacionais;
 - o primeiro ADMIN deverá ser promovido pelo procedimento privilegiado e auditado documentado;
 - o procedimento do primeiro ADMIN está documentado em `docs/BOOTSTRAP_ADMIN.md` e não foi executado;
 - reprocessamentos usam `import_processing_runs` e reutilizam o mesmo RAW;
 - parâmetros contratuais possuem tabela versionada própria, sem valores iniciais.
+
+O primeiro ADMIN ainda não foi promovido. O procedimento de `docs/BOOTSTRAP_ADMIN.md` depende de confirmação explícita do usuário.
 
 ## Imutabilidade RAW
 
@@ -33,4 +35,11 @@ O trigger `prevent_raw_mutation` bloqueia UPDATE/DELETE mesmo quando uma role de
 8. auditoria;
 9. grants e RLS.
 
-Não executar `db push`, `db reset` ou qualquer comando de aplicação sem autorização explícita.
+## Testes remotos
+
+- `tests/001_schema_smoke.sql`: RAW, expurgos, canal/equipamento, performance, vigências, importação e auditoria;
+- `tests/002_rls_smoke.sql`: `anon`, sem profile, inativo, LEITURA, GESTOR e ADMIN;
+- ambos usam `BEGIN`/`ROLLBACK` e UUIDs/e-mails reservados de fixture;
+- a verificação posterior confirmou ausência dos UUIDs e e-mails de fixture.
+
+Não executar novo `db push`, `db reset`, seed ou bootstrap de ADMIN sem autorização explícita.
