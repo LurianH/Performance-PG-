@@ -21,7 +21,6 @@ create table public.equipment_periods (
   dmc_id uuid not null references public.dmcs(id) on delete restrict,
   equipment_type text not null,
   equipment_identifier text,
-  channel_type public.measurement_channel_type,
   started_at timestamptz not null,
   ended_at timestamptz,
   status public.equipment_status not null,
@@ -41,6 +40,18 @@ create table public.equipment_periods (
 
 create index equipment_periods_dmc_time_idx on public.equipment_periods (dmc_id, started_at, ended_at);
 
+create table public.equipment_period_channels (
+  id uuid primary key default gen_random_uuid(),
+  equipment_period_id uuid not null references public.equipment_periods(id) on delete cascade,
+  channel_type public.measurement_channel_type not null,
+  notes text,
+  created_at timestamptz not null default now(),
+  constraint equipment_period_channels_unique unique (equipment_period_id, channel_type)
+);
+
+create index equipment_period_channels_channel_idx
+  on public.equipment_period_channels (channel_type, equipment_period_id);
+
 create trigger dmcs_set_updated_at
 before update on public.dmcs
 for each row execute function private.set_updated_at();
@@ -51,3 +62,6 @@ for each row execute function private.set_updated_at();
 
 comment on constraint equipment_period_no_overlap on public.equipment_periods is
   'Evita vigências sobrepostas para o mesmo DMC, tipo e identificador de equipamento.';
+
+comment on table public.equipment_period_channels is
+  'Associação explícita: somente canais vinculados herdam a condição do período do equipamento.';

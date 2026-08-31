@@ -3,11 +3,11 @@
 export type AppRole = 'ADMIN' | 'GESTOR' | 'LEITURA'
 export type SupplyGroup = 'REDE' | 'XIXOVA'
 export type EquipmentStatus =
-  | 'INSTALLED'
+  | 'NOT_INSTALLED'
+  | 'INSTALLED_NOT_COMMISSIONED'
   | 'AVAILABLE'
   | 'UNAVAILABLE'
   | 'FAILED'
-  | 'NOT_INSTALLED'
   | 'MAINTENANCE'
 
 export interface ProfileRow {
@@ -40,6 +40,10 @@ export interface ValidatedMeasurementRow {
   source_type: 'DMC' | 'SUPPLY_OUTLET'
   supply_group: SupplyGroup | null
   channel_type: string
+  invalid_reason: string | null
+  equipment_status: EquipmentStatus | null
+  has_quality_flag: boolean
+  is_excluded: boolean
   raw_value: number | null
   normalized_value: number | null
   raw_unit: string
@@ -48,4 +52,24 @@ export interface ValidatedMeasurementRow {
   quality_status: string
   exclusion_reason: string | null
   import_id: string
+}
+
+export interface EquipmentPeriodChannelRow {
+  id: string
+  equipment_period_id: string
+  channel_type: string
+  notes: string | null
+  created_at: string
+}
+
+export interface PerformanceContractParameterRow {
+  id: string
+  parameter_key: string
+  numeric_value: number | null
+  text_value: string | null
+  effective_from: string
+  effective_to: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
 }

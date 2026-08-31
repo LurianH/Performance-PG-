@@ -25,3 +25,31 @@ export function isEquipmentAvailable(status: EquipmentStatus): boolean {
 export function canUseMeasurementForHydraulics(value: number | null, status: EquipmentStatus): boolean {
   return value !== null && isEquipmentAvailable(status)
 }
+
+export interface EquipmentChannelImpact {
+  channelType: string
+  status: EquipmentStatus
+}
+
+export interface MeasurementEligibilityInput {
+  rawValue: number | null
+  channelType: string
+  equipmentImpacts: EquipmentChannelImpact[]
+  hasInvalidQualityFlag?: boolean
+  exclusionActive?: boolean
+}
+
+export function evaluateMeasurementEligibility(input: MeasurementEligibilityInput) {
+  const equipmentImpact = input.equipmentImpacts.find((impact) => impact.channelType === input.channelType)
+  const equipmentInvalid = equipmentImpact ? !isEquipmentAvailable(equipmentImpact.status) : false
+  const isValid = input.rawValue !== null
+    && !equipmentInvalid
+    && !input.hasInvalidQualityFlag
+    && !input.exclusionActive
+
+  return {
+    rawValue: input.rawValue,
+    isValid,
+    equipmentStatus: equipmentImpact?.status ?? null,
+  }
+}

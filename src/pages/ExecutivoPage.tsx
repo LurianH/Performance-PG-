@@ -10,8 +10,8 @@ export function ExecutivoPage() {
       <PageHeading title="Visão executiva" description="Acompanhamento visual do contrato e dos sinais operacionais, mantendo apuração e diagnóstico em planos separados." />
       <MockNotice />
       <div className="kpi-grid">
-        <Card><span className="kpi-label">Baseline de VP</span><strong className="kpi-value">1.969.934</strong><small>m³/mês · referência estática</small></Card>
-        <Card><span className="kpi-label">Meta de redução 100%</span><strong className="kpi-value good">307.309,626</strong><small>m³/mês · referência estática</small></Card>
+        <Card><span className="kpi-label">Baseline de VP</span><strong className="kpi-value">—</strong><small>aguardando parâmetro contratual vigente</small></Card>
+        <Card><span className="kpi-label">Meta de redução 100%</span><strong className="kpi-value">—</strong><small>aguardando parâmetro contratual vigente</small></Card>
         <Card><span className="kpi-label">Ago/26 parcial</span><strong className="kpi-value warn">148,43%</strong><small>transcrição visual, não calculada</small></Card>
         <Card><span className="kpi-label">Alimentações</span><strong className="kpi-value">2</strong><small>REDE e Xixová</small></Card>
         <Card><span className="kpi-label">DMCs mapeados</span><strong className="kpi-value">14</strong><small>diagnóstico, não apuração</small></Card>

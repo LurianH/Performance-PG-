@@ -20,11 +20,14 @@ grant execute on function private.current_user_role() to authenticated;
 alter table public.profiles enable row level security;
 alter table public.dmcs enable row level security;
 alter table public.equipment_periods enable row level security;
+alter table public.equipment_period_channels enable row level security;
 alter table public.data_imports enable row level security;
+alter table public.import_processing_runs enable row level security;
 alter table public.raw_measurements enable row level security;
 alter table public.measurement_quality_flags enable row level security;
 alter table public.measurement_exclusions enable row level security;
 alter table public.performance_months enable row level security;
+alter table public.performance_contract_parameters enable row level security;
 alter table public.projection_scenarios enable row level security;
 alter table public.projection_values enable row level security;
 alter table public.technical_parameters enable row level security;
@@ -37,11 +40,13 @@ alter table public.audit_log enable row level security;
 revoke all on all tables in schema public from anon, authenticated;
 
 grant select on public.profiles to authenticated;
-grant insert, update, delete on public.profiles to authenticated;
+grant insert, update on public.profiles to authenticated;
 
-grant select on public.dmcs, public.equipment_periods, public.data_imports,
+grant select on public.dmcs, public.equipment_periods, public.equipment_period_channels,
+  public.data_imports, public.import_processing_runs,
   public.raw_measurements, public.measurement_quality_flags,
   public.measurement_exclusions, public.performance_months,
+  public.performance_contract_parameters,
   public.projection_scenarios, public.projection_values,
   public.technical_parameters, public.analysis_runs, public.event_analysis,
   public.ips_results to authenticated;
@@ -50,15 +55,17 @@ grant select on public.validated_measurements,
   public.performance_months_derived, public.projection_values_derived to authenticated;
 
 grant insert, update on public.data_imports to authenticated;
+grant insert, update on public.import_processing_runs to authenticated;
 grant insert on public.raw_measurements to authenticated;
 grant insert, update, delete on public.measurement_quality_flags to authenticated;
 grant insert, update on public.measurement_exclusions to authenticated;
-grant insert, update, delete on public.performance_months to authenticated;
-grant insert, update, delete on public.projection_scenarios to authenticated;
-grant insert, update, delete on public.projection_values to authenticated;
+grant insert, update on public.performance_months to authenticated;
+grant insert, update on public.projection_scenarios to authenticated;
+grant insert, update on public.projection_values to authenticated;
 grant insert, update on public.technical_parameters to authenticated;
-grant insert, update on public.dmcs, public.equipment_periods to authenticated;
-grant delete on public.dmcs, public.equipment_periods to authenticated;
+grant insert, update on public.performance_contract_parameters to authenticated;
+grant insert, update on public.dmcs, public.equipment_periods, public.equipment_period_channels to authenticated;
+grant delete on public.dmcs, public.equipment_period_channels to authenticated;
 grant insert, update on public.analysis_runs, public.event_analysis, public.ips_results to authenticated;
 
 -- Profiles: usuário lê o próprio; ADMIN lê/administra todos.
@@ -76,16 +83,16 @@ create policy profiles_update_admin on public.profiles
 for update to authenticated
 using ((select private.current_user_role()) = 'ADMIN')
 with check ((select private.current_user_role()) = 'ADMIN');
-create policy profiles_delete_admin on public.profiles
-for delete to authenticated
-using ((select private.current_user_role()) = 'ADMIN');
-
 -- Leitura operacional para qualquer perfil ativo.
 create policy dmcs_select_active_role on public.dmcs
 for select to authenticated using ((select private.current_user_role()) is not null);
 create policy equipment_select_active_role on public.equipment_periods
 for select to authenticated using ((select private.current_user_role()) is not null);
+create policy equipment_channels_select_active_role on public.equipment_period_channels
+for select to authenticated using ((select private.current_user_role()) is not null);
 create policy imports_select_active_role on public.data_imports
+for select to authenticated using ((select private.current_user_role()) is not null);
+create policy import_runs_select_active_role on public.import_processing_runs
 for select to authenticated using ((select private.current_user_role()) is not null);
 create policy raw_select_active_role on public.raw_measurements
 for select to authenticated using ((select private.current_user_role()) is not null);
@@ -94,6 +101,8 @@ for select to authenticated using ((select private.current_user_role()) is not n
 create policy exclusions_select_active_role on public.measurement_exclusions
 for select to authenticated using ((select private.current_user_role()) is not null);
 create policy performance_select_active_role on public.performance_months
+for select to authenticated using ((select private.current_user_role()) is not null);
+create policy contract_parameters_select_active_role on public.performance_contract_parameters
 for select to authenticated using ((select private.current_user_role()) is not null);
 create policy scenarios_select_active_role on public.projection_scenarios
 for select to authenticated using ((select private.current_user_role()) is not null);
@@ -122,7 +131,12 @@ with check ((select private.current_user_role()) = 'ADMIN');
 create policy equipment_update_admin on public.equipment_periods for update to authenticated
 using ((select private.current_user_role()) = 'ADMIN')
 with check ((select private.current_user_role()) = 'ADMIN');
-create policy equipment_delete_admin on public.equipment_periods for delete to authenticated
+create policy equipment_channels_insert_admin on public.equipment_period_channels for insert to authenticated
+with check ((select private.current_user_role()) = 'ADMIN');
+create policy equipment_channels_update_admin on public.equipment_period_channels for update to authenticated
+using ((select private.current_user_role()) = 'ADMIN')
+with check ((select private.current_user_role()) = 'ADMIN');
+create policy equipment_channels_delete_admin on public.equipment_period_channels for delete to authenticated
 using ((select private.current_user_role()) = 'ADMIN');
 
 -- Importações e RAW: GESTOR/ADMIN inserem; RAW não possui policies de update/delete.
@@ -134,8 +148,30 @@ with check (
 create policy imports_update_operator on public.data_imports for update to authenticated
 using ((select private.current_user_role()) in ('ADMIN', 'GESTOR'))
 with check ((select private.current_user_role()) in ('ADMIN', 'GESTOR'));
+create policy import_runs_insert_operator on public.import_processing_runs for insert to authenticated
+with check (
+  (select private.current_user_role()) in ('ADMIN', 'GESTOR')
+  and initiated_by = (select auth.uid())
+);
+create policy import_runs_update_operator on public.import_processing_runs for update to authenticated
+using (
+  (select private.current_user_role()) in ('ADMIN', 'GESTOR')
+  and initiated_by = (select auth.uid())
+)
+with check (
+  (select private.current_user_role()) in ('ADMIN', 'GESTOR')
+  and initiated_by = (select auth.uid())
+);
 create policy raw_insert_operator on public.raw_measurements for insert to authenticated
-with check ((select private.current_user_role()) in ('ADMIN', 'GESTOR'));
+with check (
+  (select private.current_user_role()) in ('ADMIN', 'GESTOR')
+  and exists (
+    select 1 from public.data_imports di
+    where di.id = import_id
+      and di.imported_by = (select auth.uid())
+      and di.status in ('PENDING', 'PROCESSING', 'PARTIAL')
+  )
+);
 
 -- Flags manuais: operações frontend limitadas a detected_by USER.
 create policy quality_flags_insert_operator on public.measurement_quality_flags for insert to authenticated
@@ -170,29 +206,25 @@ with check ((select private.current_user_role()) in ('ADMIN', 'GESTOR'));
 create policy performance_update_operator on public.performance_months for update to authenticated
 using ((select private.current_user_role()) in ('ADMIN', 'GESTOR'))
 with check ((select private.current_user_role()) in ('ADMIN', 'GESTOR'));
-create policy performance_delete_operator on public.performance_months for delete to authenticated
-using ((select private.current_user_role()) = 'ADMIN');
-
 create policy scenarios_insert_operator on public.projection_scenarios for insert to authenticated
 with check ((select private.current_user_role()) in ('ADMIN', 'GESTOR'));
 create policy scenarios_update_operator on public.projection_scenarios for update to authenticated
 using ((select private.current_user_role()) in ('ADMIN', 'GESTOR'))
 with check ((select private.current_user_role()) in ('ADMIN', 'GESTOR'));
-create policy scenarios_delete_admin on public.projection_scenarios for delete to authenticated
-using ((select private.current_user_role()) = 'ADMIN');
-
 create policy projection_values_insert_operator on public.projection_values for insert to authenticated
 with check ((select private.current_user_role()) in ('ADMIN', 'GESTOR'));
 create policy projection_values_update_operator on public.projection_values for update to authenticated
 using ((select private.current_user_role()) in ('ADMIN', 'GESTOR'))
 with check ((select private.current_user_role()) in ('ADMIN', 'GESTOR'));
-create policy projection_values_delete_admin on public.projection_values for delete to authenticated
-using ((select private.current_user_role()) = 'ADMIN');
-
 -- Parâmetros versionados: somente ADMIN.
 create policy parameters_insert_admin on public.technical_parameters for insert to authenticated
 with check ((select private.current_user_role()) = 'ADMIN');
 create policy parameters_update_admin on public.technical_parameters for update to authenticated
+using ((select private.current_user_role()) = 'ADMIN')
+with check ((select private.current_user_role()) = 'ADMIN');
+create policy contract_parameters_insert_admin on public.performance_contract_parameters for insert to authenticated
+with check ((select private.current_user_role()) = 'ADMIN');
+create policy contract_parameters_update_admin on public.performance_contract_parameters for update to authenticated
 using ((select private.current_user_role()) = 'ADMIN')
 with check ((select private.current_user_role()) = 'ADMIN');
 -- Resultados derivados: preparação para executor autorizado, sem motor nesta etapa.

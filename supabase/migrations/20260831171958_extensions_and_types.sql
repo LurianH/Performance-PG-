@@ -5,7 +5,8 @@ create extension if not exists btree_gist with schema extensions;
 create type public.app_role as enum ('ADMIN', 'GESTOR', 'LEITURA');
 create type public.supply_group as enum ('REDE', 'XIXOVA');
 create type public.equipment_status as enum (
-  'INSTALLED', 'AVAILABLE', 'UNAVAILABLE', 'FAILED', 'NOT_INSTALLED', 'MAINTENANCE'
+  'NOT_INSTALLED', 'INSTALLED_NOT_COMMISSIONED', 'AVAILABLE',
+  'UNAVAILABLE', 'FAILED', 'MAINTENANCE'
 );
 create type public.import_status as enum ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'PARTIAL');
 create type public.measurement_source_type as enum ('DMC', 'SUPPLY_OUTLET');

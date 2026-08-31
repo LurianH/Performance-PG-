@@ -16,10 +16,3 @@ export const performanceMonthsMock: PerformanceMonthMock[] = [
   { competence: 'out/26', vp: 1557062, reduction: 412872, attainment: 134.4, status: 'PROJETADO' },
   { competence: 'nov/26', vp: 1391644, reduction: 578290, attainment: 188.2, status: 'PROJETADO' },
 ]
-
-export const performanceReferenceMock = {
-  baselineVp: 1969934,
-  targetReduction100: 307309.626,
-  targetVp100: 1662624.374,
-  targetVp120: 1601159,
-} as const

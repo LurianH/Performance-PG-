@@ -4,6 +4,7 @@ create table public.profiles (
   full_name text,
   role public.app_role not null default 'LEITURA',
   active boolean not null default true,
+  role_change_justification text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint profiles_email_not_blank check (btrim(email) <> '')
@@ -29,6 +30,27 @@ $$;
 create trigger profiles_set_updated_at
 before update on public.profiles
 for each row execute function private.set_updated_at();
+
+create function private.require_profile_access_justification()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if (old.role, old.active) is distinct from (new.role, new.active)
+    and nullif(btrim(new.role_change_justification), '') is null then
+    raise exception 'Role/active changes require role_change_justification';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function private.require_profile_access_justification() from public, anon, authenticated;
+
+create trigger profiles_require_access_justification
+before update on public.profiles
+for each row execute function private.require_profile_access_justification();
 
 create function private.handle_new_auth_user()
 returns trigger
