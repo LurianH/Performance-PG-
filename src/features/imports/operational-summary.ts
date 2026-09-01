@@ -1,5 +1,5 @@
 import { normalizeMeasurement } from '../hydraulics/domain-rules'
-import type { DataImportRow, ImportQualityBreakdown } from '../../types/database.types'
+import type { DataImportRow, ImportOperationalSummary, ImportQualityBreakdown } from '../../types/database.types'
 import type { ColumnMapping, PrevalidationResult } from './types'
 
 export type ImportFlagRecord = {
@@ -52,6 +52,35 @@ export function readImportChannels(item: DataImportRow) {
     const rawUnit = typeof entry.unit === 'string' ? entry.unit : '—'
     return { channelType, rawUnit, normalizedUnit: normalizeMeasurement(null, channelType, rawUnit).unit }
   })
+}
+
+export function summarizeImportSnapshot(item: DataImportRow): ImportOperationalSummary {
+  const descriptor = readImportDescriptor(item)
+  const channels = readImportChannels(item).map((channel) => ({
+    ...channel,
+    rawCount: item.accepted_count,
+    minimum: null,
+    maximum: null,
+    flags: 0,
+    flagBreakdown: [],
+    gaps: 0,
+    missingTimestamps: 0,
+    coveragePercent: calculateCoverage(descriptor.firstReading, descriptor.lastReading, descriptor.cadenceMinutes, item.accepted_count),
+  }))
+  const coverage = channels.map((channel) => channel.coveragePercent).filter((value): value is number => value !== null)
+  return {
+    import: item,
+    firstReading: descriptor.firstReading,
+    lastReading: descriptor.lastReading,
+    rawCount: channels.reduce((total, channel) => total + channel.rawCount, 0),
+    flags: 0,
+    flagBreakdown: [],
+    gaps: 0,
+    missingTimestamps: 0,
+    coveragePercent: coverage.length ? coverage.reduce((total, value) => total + value, 0) / coverage.length : null,
+    rejections: item.rejected_count,
+    channels,
+  }
 }
 
 export function calculateCoverage(firstReading: string | null, lastReading: string | null, cadenceMinutes: number | null, rawCount: number): number | null {

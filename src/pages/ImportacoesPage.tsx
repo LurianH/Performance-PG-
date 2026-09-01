@@ -11,7 +11,7 @@ import { getImportReadiness, mappingChannelOptions } from '../features/imports/r
 import type { ColumnMapping, Delimiter, FileEncoding, HeaderMode, ImportChannel, ImportSource, ParsedTable, PrevalidationResult } from '../features/imports/types'
 import { useDmcs } from '../hooks/useReferenceData'
 import { executeImport, findExistingImport, getImportSummary, listImportSummaries } from '../services/imports.service'
-import type { ImportOperationalSummary, SupplyGroup } from '../types/database.types'
+import type { DataImportRow, ImportOperationalSummary, SupplyGroup } from '../types/database.types'
 
 type SourceMode = 'SUPPLY_OUTLET' | 'DMC'
 type OperationalChannel = 'PRESSURE_SUPPLY' | 'FLOW'
@@ -48,6 +48,7 @@ export function ImportacoesPage() {
   const [history, setHistory] = useState<ImportOperationalSummary[]>([])
   const [selectedHistory, setSelectedHistory] = useState<ImportOperationalSummary | null>(null)
   const [historyLoading, setHistoryLoading] = useState(!isMockMode)
+  const [historyDetailLoading, setHistoryDetailLoading] = useState(false)
 
   const selectedDmc = activeDmcs.find((dmc) => dmc.id === selectedDmcId) ?? null
   const source = useMemo<ImportSource | null>(() => sourceMode === 'DMC' ? selectedDmc ? { type: 'DMC', dmc: selectedDmc } : null : { type: 'SUPPLY_OUTLET', supplyGroup }, [selectedDmc, sourceMode, supplyGroup])
@@ -58,6 +59,12 @@ export function ImportacoesPage() {
     setHistoryLoading(true)
     try { setHistory(await listImportSummaries()) } catch (caught) { setError(caught instanceof Error ? caught.message : 'Falha ao carregar o histórico.') } finally { setHistoryLoading(false) }
   }, [isMockMode])
+  const openHistoryDetail = useCallback(async (item: DataImportRow) => {
+    setSelectedHistory(null); setHistoryDetailLoading(true); setError(null)
+    try { setSelectedHistory(await getImportSummary(item)) }
+    catch { setError('Falha ao carregar os detalhes da importação.') }
+    finally { setHistoryDetailLoading(false) }
+  }, [])
   useEffect(() => { void refreshHistory() }, [refreshHistory])
 
   const mappingsFor = useCallback((parsed: ParsedTable, selectedChannel = channel, selectedUnit = unit) => {
@@ -145,7 +152,8 @@ export function ImportacoesPage() {
       {step === 4 && <div className="wizard-panel"><RefreshCw className="spin" /><h3>5. Processamento em lotes</h3><progress value={progress.processed} max={progress.total || 1} /><strong>{progress.processed.toLocaleString('pt-BR')} / {progress.total.toLocaleString('pt-BR')} medições processadas</strong><p className="desc">Storage privado sem sobrescrita; RAW confirmado permanece imutável.</p></div>}
       {step === 5 && <div className="wizard-panel">{result ? <><CheckCircle2 className="good" size={40} /><h3>6. Importação concluída</h3><ImportMetrics summary={result} dmcName={result.import.dmc_id ? dmcNames.get(result.import.dmc_id) : undefined} /></> : <><h3>Importação não concluída</h3><p className="desc">Nenhuma tentativa automática será realizada.</p></>}<button type="button" onClick={resetWizard}>Nova importação</button></div>}
     </Card>
-    <History history={history} loading={historyLoading} dmcNames={dmcNames} select={setSelectedHistory} />
+    <History history={history} loading={historyLoading} dmcNames={dmcNames} select={(item) => void openHistoryDetail(item)} />
+    {historyDetailLoading && <DataState loading error={null} empty="" />}
     {selectedHistory && <Card className="import-history-detail"><div className="section-title"><div><h3>Detalhes da importação</h3><p className="desc">Consulta somente leitura. RAW não pode ser editado nem excluído.</p></div><button type="button" className="secondary-button" onClick={() => setSelectedHistory(null)}>Fechar</button></div><ImportMetrics summary={selectedHistory} dmcName={selectedHistory.import.dmc_id ? dmcNames.get(selectedHistory.import.dmc_id) : undefined} /></Card>}
   </>
 }
@@ -177,8 +185,8 @@ function PrevalidationMetrics({ value, mappings, table }: { value: Prevalidation
   return <><dl className="validation-grid">{items.map(([label, content]) => <div key={label}><dt>{label}</dt><dd>{content}</dd></div>)}</dl><div className="table-wrap"><table><thead><tr><th>Canal/coluna</th><th>Unidade</th><th>RAW previsto</th><th>Mínimo</th><th>Máximo</th><th>Flags</th><th>Gaps</th><th>Cobertura</th></tr></thead><tbody>{channels.map((item) => <tr key={item.mapping.index}><td>{item.mapping.channelType}<small className="cell-note">Coluna {item.mapping.index + 1}: {item.mapping.displayName}</small></td><td>{item.mapping.unit}</td><td>{item.rawCount.toLocaleString('pt-BR')}</td><td>{formatRawNumber(item.minimum)}</td><td>{formatRawNumber(item.maximum)}</td><td>{item.quality.total}</td><td>{item.quality.gaps} · {item.quality.missingTimestamps} ausências</td><td>{item.coverage === null ? '—' : `${formatNumber(item.coverage)}%`}</td></tr>)}</tbody></table></div>{quality.breakdown.length > 0 && <div className="quality-breakdown"><strong>Warnings previstos</strong>{quality.breakdown.map((flag) => <Badge key={`${flag.type}-${flag.severity}`} tone="warning">{flag.type}: {flag.count}</Badge>)}</div>}</>
 }
 
-function History({ history, loading, dmcNames, select }: { history: ImportOperationalSummary[]; loading: boolean; dmcNames: Map<string, string>; select: (summary: ImportOperationalSummary) => void }) {
-  return <Card><h3>Histórico de importações</h3>{loading ? <DataState loading error={null} empty="" /> : history.length === 0 ? <div className="table-empty">Nenhuma importação registrada</div> : <div className="table-wrap"><table><thead><tr><th>Data</th><th>Arquivo</th><th>Origem</th><th>DMC/Alimentação</th><th>Canais</th><th>Período</th><th>RAW</th><th>Cobertura</th><th>Status</th><th>Detalhes</th></tr></thead><tbody>{history.map((summary) => <tr key={summary.import.id}><td>{formatDate(summary.import.imported_at)}</td><td>{summary.import.original_filename}</td><td>{summary.import.source_type}</td><td>{summary.import.dmc_id ? dmcNames.get(summary.import.dmc_id) ?? 'DMC não localizado' : summary.import.supply_group}</td><td>{summary.channels.map((item) => item.channelType).join(', ')}</td><td>{formatDate(summary.firstReading)} → {formatDate(summary.lastReading)}</td><td>{summary.rawCount.toLocaleString('pt-BR')}</td><td>{summary.coveragePercent === null ? '—' : `${formatNumber(summary.coveragePercent)}%`}</td><td><Badge tone={summary.import.status === 'COMPLETED' ? 'success' : summary.import.status === 'FAILED' ? 'danger' : 'warning'}>{summary.import.status}</Badge></td><td><button type="button" className="secondary-button inline-button" onClick={() => select(summary)}><Search size={15} /> Consultar</button></td></tr>)}</tbody></table></div>}</Card>
+function History({ history, loading, dmcNames, select }: { history: ImportOperationalSummary[]; loading: boolean; dmcNames: Map<string, string>; select: (item: DataImportRow) => void }) {
+  return <Card><h3>Histórico de importações</h3>{loading ? <DataState loading error={null} empty="" /> : history.length === 0 ? <div className="table-empty">Nenhuma importação registrada</div> : <div className="table-wrap"><table><thead><tr><th>Data</th><th>Arquivo</th><th>Origem</th><th>DMC/Alimentação</th><th>Canais</th><th>Período</th><th>RAW</th><th>Cobertura</th><th>Status</th><th>Detalhes</th></tr></thead><tbody>{history.map((summary) => <tr key={summary.import.id}><td>{formatDate(summary.import.imported_at)}</td><td>{summary.import.original_filename}</td><td>{summary.import.source_type}</td><td>{summary.import.dmc_id ? dmcNames.get(summary.import.dmc_id) ?? 'DMC não localizado' : summary.import.supply_group}</td><td>{summary.channels.map((item) => item.channelType).join(', ')}</td><td>{formatDate(summary.firstReading)} → {formatDate(summary.lastReading)}</td><td>{summary.rawCount.toLocaleString('pt-BR')}</td><td>{summary.coveragePercent === null ? '—' : `${formatNumber(summary.coveragePercent)}%`}</td><td><Badge tone={summary.import.status === 'COMPLETED' ? 'success' : summary.import.status === 'FAILED' ? 'danger' : 'warning'}>{summary.import.status}</Badge></td><td><button type="button" className="secondary-button inline-button" onClick={() => select(summary.import)}><Search size={15} /> Consultar</button></td></tr>)}</tbody></table></div>}</Card>
 }
 
 function ImportMetrics({ summary, dmcName }: { summary: ImportOperationalSummary; dmcName?: string }) {

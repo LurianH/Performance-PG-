@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase'
 import type { DataImportRow, ImportChannelOperationalSummary, ImportOperationalSummary } from '../types/database.types'
 import { IMPORT_ALGORITHM_VERSION, serializeMappings } from '../features/imports/parser'
-import { calculateCoverage, readImportChannels, readImportDescriptor, summarizeFlags, type ImportFlagRecord } from '../features/imports/operational-summary'
+import { calculateCoverage, readImportChannels, readImportDescriptor, summarizeFlags, summarizeImportSnapshot, type ImportFlagRecord } from '../features/imports/operational-summary'
 import type { ColumnMapping, ImportSource, ObjectiveFlag, PrevalidationResult } from '../features/imports/types'
 
 export const DEFAULT_IMPORT_BATCH_SIZE = 500
@@ -50,7 +50,8 @@ export async function getImportSummary(item: DataImportRow): Promise<ImportOpera
     client().from('import_rejected_rows').select('id', { count: 'exact', head: true }).eq('import_id', item.id),
   ])
   if (rejectedResult.error) throw rejectedResult.error
-  const channels = await Promise.all(descriptors.map(async (channel): Promise<ImportChannelOperationalSummary> => {
+  const channels: ImportChannelOperationalSummary[] = []
+  for (const channel of descriptors) {
     const baseRaw = () => client().from('raw_measurements').select('raw_value').eq('import_id', item.id).eq('channel_type', channel.channelType)
     const [countResult, minimumResult, maximumResult] = await Promise.all([
       client().from('raw_measurements').select('id', { count: 'exact', head: true }).eq('import_id', item.id).eq('channel_type', channel.channelType),
@@ -61,8 +62,8 @@ export async function getImportSummary(item: DataImportRow): Promise<ImportOpera
     if (error) throw error
     const rawCount = countResult.count ?? 0
     const quality = summarizeFlags(flagRows.filter((row) => row.raw_measurements.channel_type === channel.channelType))
-    return { ...channel, rawCount, minimum: minimumResult.data?.raw_value == null ? null : Number(minimumResult.data.raw_value), maximum: maximumResult.data?.raw_value == null ? null : Number(maximumResult.data.raw_value), flags: quality.total, flagBreakdown: quality.breakdown, gaps: quality.gaps, missingTimestamps: quality.missingTimestamps, coveragePercent: calculateCoverage(descriptor.firstReading, descriptor.lastReading, descriptor.cadenceMinutes, rawCount) }
-  }))
+    channels.push({ ...channel, rawCount, minimum: minimumResult.data?.raw_value == null ? null : Number(minimumResult.data.raw_value), maximum: maximumResult.data?.raw_value == null ? null : Number(maximumResult.data.raw_value), flags: quality.total, flagBreakdown: quality.breakdown, gaps: quality.gaps, missingTimestamps: quality.missingTimestamps, coveragePercent: calculateCoverage(descriptor.firstReading, descriptor.lastReading, descriptor.cadenceMinutes, rawCount) })
+  }
   const rawCount = channels.reduce((total, channel) => total + channel.rawCount, 0)
   const quality = summarizeFlags(flagRows)
   const coverageValues = channels.map((channel) => channel.coveragePercent).filter((value): value is number => value !== null)
@@ -82,7 +83,7 @@ export async function getImportSummary(item: DataImportRow): Promise<ImportOpera
 }
 
 export async function listImportSummaries(): Promise<ImportOperationalSummary[]> {
-  return Promise.all((await listImports()).map(getImportSummary))
+  return (await listImports()).map(summarizeImportSnapshot)
 }
 
 function batches<T>(values: T[], size: number): T[][] {

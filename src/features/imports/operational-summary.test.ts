@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DataImportRow } from '../../types/database.types'
 import { prevalidateDelimitedText } from './parser'
-import { calculateCoverage, formatImportDecimal, readImportChannels, readImportDescriptor, summarizeFlags, summarizePrevalidationChannels } from './operational-summary'
+import { calculateCoverage, formatImportDecimal, readImportChannels, readImportDescriptor, summarizeFlags, summarizeImportSnapshot, summarizePrevalidationChannels } from './operational-summary'
 import type { ColumnMapping } from './types'
 
 const imported: DataImportRow = {
@@ -15,6 +15,12 @@ describe('resumo operacional de importação', () => {
   it('extrai todos os canais mapeados de um import DMC', () => {
     const dmcImport = { ...imported, source_type: 'DMC' as const, dmc_id: 'dmc-1', supply_group: null, mapping_json: [{ channel_type: 'TIMESTAMP', unit: null }, { channel_type: 'PRESSURE_PC', unit: 'mca' }, { channel_type: 'FLOW', unit: 'm3_h' }, { channel_type: 'IGNORE', unit: null }] }
     expect(readImportChannels(dmcImport)).toEqual([{ channelType: 'PRESSURE_PC', rawUnit: 'mca', normalizedUnit: 'mca' }, { channelType: 'FLOW', rawUnit: 'm3_h', normalizedUnit: 'l_s' }])
+  })
+  it('resume histórico misto de alimentação e DMC somente pelos snapshots', () => {
+    const supply = summarizeImportSnapshot(imported)
+    const dmc = summarizeImportSnapshot({ ...imported, id: 'import-2', source_type: 'DMC', dmc_id: 'dmc-1', supply_group: null, accepted_count: 10, mapping_json: [{ channel_type: 'TIMESTAMP', unit: null }, { channel_type: 'PRESSURE_PC', unit: 'mca' }, { channel_type: 'FLOW', unit: 'm3_h' }] })
+    expect(supply).toMatchObject({ rawCount: 4, channels: [{ channelType: 'FLOW', rawCount: 4 }] })
+    expect(dmc).toMatchObject({ rawCount: 20, channels: [{ channelType: 'PRESSURE_PC', rawCount: 10 }, { channelType: 'FLOW', rawCount: 10 }] })
   })
   it('calcula cobertura sem hardcode e limita em 100%', () => { expect(calculateCoverage('2026-01-01T03:00:00Z', '2026-01-01T04:00:00Z', 15, 4)).toBe(80); expect(calculateCoverage('2026-01-01T03:00:00Z', '2026-01-01T04:00:00Z', 15, 8)).toBe(100) })
   it('resume flags e soma ausências sem materializar timestamps', () => expect(summarizeFlags([
