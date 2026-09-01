@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DataImportRow, ImportChannelOperationalSummary, ImportOperationalSummary } from '../types/database.types'
-import { IMPORT_ALGORITHM_VERSION, serializeMappings } from '../features/imports/parser'
+import { decodeBytes, IMPORT_ALGORITHM_VERSION, prevalidateDelimitedText, serializeMappings, sha256Hex } from '../features/imports/parser'
 import { calculateCoverage, readImportChannels, readImportDescriptor, summarizeFlags, summarizeImportSnapshot, type ImportFlagRecord } from '../features/imports/operational-summary'
-import type { ColumnMapping, ImportSource, ObjectiveFlag, PrevalidationResult } from '../features/imports/types'
+import { flagRecoveryKey, groupFlagsByColumn, missingFlags, missingMeasurements, rawRecoveryKey, recoveryBatches } from '../features/imports/recovery'
+import type { ColumnMapping, Delimiter, FileEncoding, HeaderMode, ImportSource, ObjectiveFlag, PrevalidationResult } from '../features/imports/types'
 
 export const DEFAULT_IMPORT_BATCH_SIZE = 500
 export const HYDRAULIC_IMPORT_BUCKET = 'hydraulic-imports'
@@ -87,9 +89,26 @@ export async function listImportSummaries(): Promise<ImportOperationalSummary[]>
 }
 
 function batches<T>(values: T[], size: number): T[][] {
-  const result: T[][] = []
-  for (let index = 0; index < values.length; index += size) result.push(values.slice(index, index + size))
-  return result
+  return recoveryBatches(values, size)
+}
+
+function mappingsFromSnapshot(snapshot: unknown): ColumnMapping[] {
+  if (!Array.isArray(snapshot)) throw new Error('Snapshot de mapeamento inválido; retomada bloqueada.')
+  return snapshot.map((entry, index) => {
+    const value = entry as Record<string, unknown>
+    const columnIndex = Number(value.column_index)
+    const channelType = String(value.channel_type) as ColumnMapping['channelType']
+    if (!Number.isInteger(columnIndex) || !['IGNORE', 'TIMESTAMP', 'PRESSURE_PC', 'PRESSURE_UPSTREAM', 'PRESSURE_DOWNSTREAM', 'PRESSURE_SUPPLY', 'FLOW', 'OTHER'].includes(channelType)) throw new Error(`Mapeamento inválido na posição ${index + 1}.`)
+    return { index: columnIndex, headerOriginal: typeof value.header_original === 'string' ? value.header_original : null, displayName: typeof value.display_name === 'string' ? value.display_name : `Coluna ${columnIndex + 1}`, headerNormalized: '', channelType, unit: typeof value.unit === 'string' ? value.unit : null, confidence: 'HIGH' }
+  })
+}
+
+function metadataFromSnapshot(snapshot: unknown): { encoding: FileEncoding; delimiter: Delimiter; headerMode: HeaderMode } {
+  const value = (snapshot ?? {}) as Record<string, unknown>
+  const encoding = value.encoding === 'WINDOWS-1252' ? 'WINDOWS-1252' : 'UTF-8'
+  const delimiter = value.delimiter === ',' || value.delimiter === '\t' ? value.delimiter : ';'
+  const headerMode = value.has_header === true ? 'PRESENT' : 'ABSENT'
+  return { encoding, delimiter, headerMode }
 }
 
 export interface ExecuteImportInput {
@@ -161,6 +180,91 @@ export async function executeImport(input: ExecuteImportInput): Promise<DataImpo
   const { data, error } = await client().from('data_imports').update({ status: 'COMPLETED', accepted_count: input.prevalidation.validTimestampCount, rejected_count: input.prevalidation.invalidTimestampCount }).eq('id', importId).select('*').single()
   if (error) return fail('PARTIAL', error.message)
   return data as DataImportRow
+}
+
+export async function resumeImport(item: DataImportRow, userId: string, onProgress?: (processed: number, total: number) => void, recoveryClient: SupabaseClient = client()): Promise<DataImportRow> {
+  if (!['PROCESSING', 'PARTIAL'].includes(item.status)) throw new Error('Somente imports PROCESSING ou PARTIAL podem ser retomados.')
+  if (!item.storage_path) throw new Error('Import sem objeto de Storage; retomada bloqueada.')
+  if (item.imported_by !== userId) throw new Error('A retomada deve ser executada pelo usuário que iniciou o import.')
+
+  let duplicateBuilder = recoveryClient.from('data_imports').select('id', { count: 'exact', head: true }).eq('file_hash', item.file_hash).eq('source_type', item.source_type)
+  duplicateBuilder = item.source_type === 'DMC' ? duplicateBuilder.eq('dmc_id', item.dmc_id) : duplicateBuilder.eq('supply_group', item.supply_group)
+  const duplicateQuery = await duplicateBuilder
+  if (duplicateQuery.error) throw duplicateQuery.error
+  if (duplicateQuery.count !== 1) throw new Error('Contexto duplicado ou ausente; retomada bloqueada.')
+
+  const download = await recoveryClient.storage.from(HYDRAULIC_IMPORT_BUCKET).download(item.storage_path)
+  if (download.error) throw new Error(`Falha ao ler arquivo original do Storage: ${download.error.message}`)
+  const bytes = await download.data.arrayBuffer()
+  if (await sha256Hex(bytes) !== item.file_hash) throw new Error('Hash do objeto de Storage diverge do import; retomada bloqueada.')
+
+  const mappings = mappingsFromSnapshot(item.mapping_json)
+  const metadata = metadataFromSnapshot(item.metadata_json)
+  const parsed = prevalidateDelimitedText(decodeBytes(new Uint8Array(bytes), metadata.encoding), metadata.delimiter, metadata.encoding, metadata.headerMode, mappings)
+  if (parsed.result.sourceRowCount !== item.row_count) throw new Error('Quantidade de linhas diverge do snapshot original; retomada bloqueada.')
+
+  const run = await recoveryClient.from('import_processing_runs').insert({ import_id: item.id, status: 'PROCESSING', mapping_snapshot: item.mapping_json, metadata_snapshot: item.metadata_json, reason: 'Retomada idempotente de importação interrompida', initiated_by: userId, started_at: new Date().toISOString() }).select('id').single()
+  if (run.error) throw run.error
+  let processed = 0
+  try {
+    for (const batch of batches(parsed.result.measurements, DEFAULT_IMPORT_BATCH_SIZE)) {
+      const rowNumbers = [...new Set(batch.map((measurement) => measurement.rowNumber))]
+      const existing = await recoveryClient.from('raw_measurements').select('row_number,column_index').eq('import_id', item.id).in('row_number', rowNumbers)
+      if (existing.error) throw existing.error
+      const existingKeys = new Set((existing.data ?? []).map((row) => rawRecoveryKey(Number(row.row_number), Number(row.column_index))))
+      const missing = missingMeasurements(batch, existingKeys)
+      if (missing.length) {
+        const payload = missing.map((measurement) => ({ import_id: item.id, dmc_id: item.dmc_id, source_type: item.source_type, supply_group: item.supply_group, channel_type: measurement.channelType, channel_name: measurement.channelName, measured_at: measurement.measuredAt, raw_value: measurement.rawValue, unit: measurement.unit, row_number: measurement.rowNumber, column_index: measurement.columnIndex, raw_payload: measurement.rawPayload }))
+        const inserted = await recoveryClient.from('raw_measurements').insert(payload)
+        if (inserted.error) throw inserted.error
+      }
+      processed += batch.length
+      onProgress?.(processed, parsed.result.measurements.length)
+    }
+
+    for (const batch of batches(parsed.result.rejectedRows, DEFAULT_IMPORT_BATCH_SIZE)) {
+      const rejected = await recoveryClient.from('import_rejected_rows').upsert(batch.map((row) => ({ import_id: item.id, row_number: row.rowNumber, raw_payload: row.rawPayload, reason_code: row.reasonCode, details: row.details })), { onConflict: 'import_id,row_number,reason_code', ignoreDuplicates: true })
+      if (rejected.error) throw rejected.error
+    }
+
+    for (const batch of batches(parsed.result.flags, DEFAULT_IMPORT_BATCH_SIZE)) {
+      const ids = new Map<string, string>()
+      for (const [columnIndex, columnFlags] of groupFlagsByColumn(batch)) {
+        const rowNumbers = [...new Set(columnFlags.map((flag) => flag.rowNumber))]
+        const measurements = await recoveryClient.from('raw_measurements').select('id,row_number,column_index').eq('import_id', item.id).eq('column_index', columnIndex).in('row_number', rowNumbers)
+        if (measurements.error) throw measurements.error
+        ;(measurements.data ?? []).forEach((row) => ids.set(rawRecoveryKey(Number(row.row_number), Number(row.column_index)), String(row.id)))
+      }
+      const candidates = batch.map((flag) => ({ measurementId: ids.get(rawRecoveryKey(flag.rowNumber, flag.columnIndex)), flagType: flag.flagType, algorithmVersion: IMPORT_ALGORITHM_VERSION, severity: flag.severity, details: flag.details })).filter((flag): flag is typeof flag & { measurementId: string } => Boolean(flag.measurementId))
+      if (candidates.length !== batch.length) throw new Error('Medição RAW ausente durante geração de flags; retomada interrompida.')
+      const existing = await recoveryClient.from('measurement_quality_flags').select('measurement_id,flag_type,algorithm_version').in('measurement_id', candidates.map((flag) => flag.measurementId)).eq('algorithm_version', IMPORT_ALGORITHM_VERSION)
+      if (existing.error) throw existing.error
+      const existingKeys = new Set((existing.data ?? []).map((flag) => flagRecoveryKey(String(flag.measurement_id), flag.flag_type as ObjectiveFlag['flagType'], String(flag.algorithm_version))))
+      const missing = missingFlags(candidates, existingKeys)
+      if (missing.length) {
+        const inserted = await recoveryClient.from('measurement_quality_flags').upsert(missing.map((flag) => ({ measurement_id: flag.measurementId, flag_type: flag.flagType, severity: flag.severity, detected_by: 'SYSTEM', algorithm_version: flag.algorithmVersion, details: flag.details })), { onConflict: 'measurement_id,flag_type,algorithm_version', ignoreDuplicates: true })
+        if (inserted.error) throw inserted.error
+      }
+    }
+
+    for (const mapping of mappings.filter((mapping) => !['IGNORE', 'TIMESTAMP'].includes(mapping.channelType))) {
+      const expected = parsed.result.measurements.filter((measurement) => measurement.columnIndex === mapping.index).length
+      const persisted = await recoveryClient.from('raw_measurements').select('id', { count: 'exact', head: true }).eq('import_id', item.id).eq('column_index', mapping.index)
+      if (persisted.error) throw persisted.error
+      if (persisted.count !== expected) throw new Error(`Contagem RAW divergente em ${mapping.channelType}: esperado ${expected}, persistido ${persisted.count ?? 0}.`)
+    }
+
+    const completed = await recoveryClient.from('data_imports').update({ status: 'COMPLETED', accepted_count: parsed.result.validTimestampCount, rejected_count: parsed.result.invalidTimestampCount, notes: 'Retomada idempotente concluída com validação integral.' }).eq('id', item.id).in('status', ['PROCESSING', 'PARTIAL']).select('*').single()
+    if (completed.error) throw completed.error
+    const finishedRun = await recoveryClient.from('import_processing_runs').update({ status: 'COMPLETED', finished_at: new Date().toISOString() }).eq('id', run.data.id)
+    if (finishedRun.error) throw finishedRun.error
+    return completed.data as DataImportRow
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : 'Retomada interrompida.'
+    await recoveryClient.from('data_imports').update({ status: 'PARTIAL', notes: message }).eq('id', item.id).in('status', ['PROCESSING', 'PARTIAL'])
+    await recoveryClient.from('import_processing_runs').update({ status: 'PARTIAL', finished_at: new Date().toISOString() }).eq('id', run.data.id)
+    throw caught
+  }
 }
 
 export async function requestReprocessing(item: DataImportRow, userId: string, reason = 'Reprocessamento solicitado pela interface'): Promise<void> {
