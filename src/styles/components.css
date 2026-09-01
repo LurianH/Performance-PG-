@@ -121,3 +121,9 @@ tbody tr:hover { background: #f8faf9; }
 @media (max-width: 600px) {
   .wizard-steps, .origin-grid, .parser-controls, .validation-grid, .result-grid, .context-grid, .operational-config { grid-template-columns: 1fr; }
 }
+
+.diagnostic-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; margin: .8rem 0; }
+.diagnostic-card-grid span { display: grid; gap: .15rem; padding: .5rem; border: 1px solid var(--border); border-radius: .45rem; color: var(--muted); font-size: .66rem; background: #f8fbfa; }
+.diagnostic-card-grid strong { color: var(--ink); font-size: .76rem; }
+.diagnostic-back { display: inline-flex; align-items: center; gap: .35rem; margin-bottom: .75rem; color: var(--green); text-decoration: none; font-weight: 700; font-size: .78rem; }
+.diagnostic-table { max-height: 34rem; }

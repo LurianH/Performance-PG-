@@ -124,6 +124,64 @@ export interface DmcSeriesSummary extends Omit<SupplySeriesSummary, 'supplyGroup
   dmcId: string
 }
 
+export type HydraulicStatus = 'GREEN' | 'YELLOW' | 'RED' | 'DATA_FAILURE' | 'NO_DATA'
+export type HydraulicTrend = 'IMPROVEMENT' | 'STABLE' | 'WORSENING' | 'NO_BASELINE'
+
+export interface DmcHydraulicDailyRow {
+  id: string
+  analysis_run_id: string
+  dmc_id: string
+  analysis_date: string
+  rule_version: string
+  pc_min: number | null
+  pc_avg: number | null
+  pc_max: number | null
+  pc_min_at: string | null
+  pc_max_at: string | null
+  hours_below_10: number
+  critical_hours_below_3_2: number
+  hours_above_50: number
+  night_green_pct: number | null
+  night_yellow_pct: number | null
+  night_red_pct: number | null
+  pc_night_avg: number | null
+  flow_avg_l_s: number | null
+  flow_min_l_s: number | null
+  flow_max_l_s: number | null
+  flow_night_avg_l_s: number | null
+  coverage_pct: number
+  gap_count: number
+  largest_gap_minutes: number
+  quality_flags: Record<string, number>
+  daily_status: HydraulicStatus
+  night_pc_flow_correlation: number | null
+}
+
+export interface DmcHydraulicMonthlyRow {
+  id: string
+  analysis_run_id: string
+  dmc_id: string
+  competence: string
+  rule_version: string
+  pc_avg: number | null
+  pc_min: number | null
+  pc_max: number | null
+  hours_below_10: number
+  critical_hours_below_3_2: number
+  hours_above_50: number
+  green_days_pct: number | null
+  yellow_days_pct: number | null
+  red_days_pct: number | null
+  flow_avg_l_s: number | null
+  flow_night_avg_l_s: number | null
+  coverage_pct: number
+  data_failure_days: number
+  trend: HydraulicTrend
+  previous_month_delta: number | null
+  night_pc_flow_correlation: number | null
+  quality_flags: Record<string, number>
+}
+
 export interface DataImportRow {
   id: string
   filename: string

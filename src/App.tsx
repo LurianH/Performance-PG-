@@ -7,6 +7,7 @@ const ExecutivoPage = lazy(() => import('./pages/ExecutivoPage'))
 const ApuracaoPage = lazy(() => import('./pages/ApuracaoPage'))
 const ProjecoesPage = lazy(() => import('./pages/ProjecoesPage'))
 const PressoesPage = lazy(() => import('./pages/PressoesPage'))
+const DmcDiagnosticPage = lazy(() => import('./pages/DmcDiagnosticPage'))
 const QualidadePage = lazy(() => import('./pages/QualidadePage'))
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
@@ -22,6 +23,7 @@ export function App() {
           <Route path="apuracao" element={<ApuracaoPage />} />
           <Route path="projecoes" element={<ProjecoesPage />} />
           <Route path="pressoes" element={<PressoesPage />} />
+          <Route path="pressoes/:dmcId" element={<DmcDiagnosticPage />} />
           <Route path="qualidade" element={<QualidadePage />} />
           <Route path="importacoes" element={<ProtectedRoute allowedRoles={['ADMIN', 'GESTOR']}><ImportacoesPage /></ProtectedRoute>} />
           <Route path="configuracoes" element={<ProtectedRoute allowedRoles={['ADMIN']}><ConfiguracoesPage /></ProtectedRoute>} />

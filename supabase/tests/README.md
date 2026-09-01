@@ -4,6 +4,7 @@ Os testes foram implementados como scripts SQL transacionais e executados no Pos
 
 - `001_schema_smoke.sql` — regras estruturais e de domínio;
 - `002_rls_smoke.sql` — matriz de autorização e RLS.
+- `006_hydraulic_diagnostics.sql` — persistência analítica, RLS e executor interno da ETAPA 8.
 
 Cada script inicia com `BEGIN` e termina com `ROLLBACK`. Os e-mails usam o domínio reservado `example.invalid` e os UUIDs são fixos e exclusivos para facilitar a verificação posterior.
 
