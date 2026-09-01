@@ -64,7 +64,7 @@ Ambos retornaram sucesso e terminaram com `ROLLBACK`. A consulta posterior confi
 
 ## Estado de usuários
 
-Após a implantação foram identificados 8 usuários já existentes no Supabase Auth, todos com profile ativo `LEITURA`. Nenhum deles foi criado pelos smoke tests e nenhum foi promovido. É necessário confirmar qual usuário será usado no bootstrap antes de executar `docs/BOOTSTRAP_ADMIN.md`.
+Após a implantação foram identificados profiles existentes no Supabase Auth. O bootstrap controlado do primeiro ADMIN foi concluído na ETAPA 3.1 e está registrado em `docs/ETAPA_3_1_BOOTSTRAP_ADMIN.md`.
 
 ## Conexão local
 

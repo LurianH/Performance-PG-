@@ -1,5 +1,6 @@
 import { BarChart3, Database, Droplets, Gauge, Settings, ShieldCheck } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { RoleGuard } from '../../features/auth/RoleGuard'
 import { useAuth } from '../../features/auth/useAuth'
 
 const navigation = [
@@ -8,7 +9,6 @@ const navigation = [
   { to: '/projecoes', label: 'Projeções', icon: Gauge },
   { to: '/pressoes', label: 'Pressões / DMCs', icon: Droplets },
   { to: '/qualidade', label: 'Qualidade', icon: ShieldCheck },
-  { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
 export function AppHeader() {
@@ -32,6 +32,12 @@ export function AppHeader() {
             {label}
           </NavLink>
         ))}
+        <RoleGuard roles={['ADMIN']}>
+          <NavLink to="/configuracoes" className={({ isActive }) => `tab${isActive ? ' active' : ''}`}>
+            <Settings size={16} aria-hidden="true" />
+            Configurações
+          </NavLink>
+        </RoleGuard>
       </nav>
     </header>
   )
