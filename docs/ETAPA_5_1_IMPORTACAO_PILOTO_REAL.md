@@ -78,3 +78,32 @@ Todas as 26.831 leituras foram preservadas como `PRESSURE_SUPPLY`: `raw_value = 
 Os sanity checks foram confirmados no RAW e na view: 01/11/2025 às 00:00 = 17,33; 00:15 = 10,87; 00:30 = 3,81; 00:45 = 3,90; 04:00 = 11,34; 04:30 = 13,38; 04:45 = 14,49; 05:00 = 17,50 mca. Também foram confirmados 02/11 00:15 = 3,27; 03/11 13:30 = 1,54; 25/11 00:30 = 2,84; 30/11 00:15 = 3,18 mca. A leitura isolada de 1,54 mca permanece válida e não foi classificada como PC, erro ou outlier.
 
 O original de 746.364 bytes, MIME `text/csv`, foi preservado sem upsert no bucket privado `hydraulic-imports`. Idempotência e UPDATE/DELETE do RAW foram testados em transação com rollback: a duplicação foi bloqueada e as 26.831 medições permaneceram intactas. Nenhuma vazão XIXOVA, análise, expurgo, CPE, IAL, IPS ou classificação causal foi criada. Pressão XIXOVA está disponível e aguarda FLOW XIXOVA para futuro cruzamento P/Q.
+
+## PILOTO 04 — VAZÃO XIXOVA
+
+- Arquivo: `vazao xixova.csv`
+- SHA-256 abreviado: `003d143b8c583b63…`
+- Import ID: `3cbf87a5-32f2-474d-86d6-ee79387a1560`
+- Status: `COMPLETED`
+- Origem: `SUPPLY_OUTLET / XIXOVA`, sem DMC
+- Cabeçalho: não possui (`has_header = false`, confiança alta)
+- Encoding/delimitador: UTF-8 / `;`
+- Timezone: `America/Sao_Paulo`
+- Mapeamento: Coluna 1 = `TIMESTAMP`; Coluna 2 = `FLOW`, `l_s`; Coluna 3 vazia = `IGNORE`
+- Período: 01/11/2025 00:00 a 31/08/2026 23:45
+- Linhas físicas/dados/RAW: 28.546 / 28.546 / 28.546
+- Rejeições e registros inválidos: 0 / 0
+- Flags: 35 (`MISSING_TIMESTAMP`: 7; `ZERO_STREAK`: 28; demais: 0), todas `WARNING`
+- Gaps: 7; 638 timestamps estimados ausentes no total
+- Maior gap: 07/03/2026 11:45 a 13/03/2026 09:45; 8.520 minutos; 567 timestamps esperados ausentes
+- Duplicidades/nulos/erros numéricos: 0 / 0 / 0
+- Mínimo/máximo RAW: 0,00 / 1.470,60 L/s
+- Unidade RAW e normalizada: `l_s`; nenhuma conversão aplicada
+
+Todas as 28.546 leituras foram preservadas como `FLOW`: `raw_value = normalized_value` e `raw_unit = normalized_unit = l_s`. Os 448 valores zero permaneceram zero no RAW. As 28 sequências objetivas de zero receberam somente `WARNING`; não houve interpolação, preenchimento de gaps, propagação, expurgo ou invalidação.
+
+Sanity checks persistidos: primeira leitura em 01/11/2025 00:00 = 358,76 L/s; mínimo/zero em 31/12/2025 23:15 = 0,00 L/s; máximo em 06/03/2026 14:45 = 1.470,60 L/s; última em 31/08/2026 23:45 = 353,68 L/s. Nas bordas do maior gap, 07/03/2026 11:45 = 915,36 L/s e 13/03/2026 09:45 = 852,91 L/s. Em todas as amostras, RAW e normalizado coincidem e permanecem válidos.
+
+O original de 827.204 bytes e MIME `text/csv` foi preservado no bucket privado `hydraulic-imports`, em caminho exclusivo, com upload sem upsert. A tentativa duplicada por hash/origem/XIXOVA foi bloqueada em transação; UPDATE e DELETE do RAW foram igualmente bloqueados, com rollback integral. Os três imports anteriores conservaram exatamente suas contagens RAW.
+
+A interface deriva dinamicamente a disponibilidade das quatro séries de alimentação: pressão e vazão de REDE; pressão e vazão de XIXOVA. Nenhuma correlação pressão × vazão, análise, expurgo, DMC, CPE, IAL, IPS ou classificação causal foi executada.
