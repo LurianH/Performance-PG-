@@ -11,9 +11,16 @@ const EMPTY_COUNTS: ReferenceCounts = { imports: 0, raw: 0, exclusions: 0, flags
 
 function useRealMode() { return !useAuth().isMockMode }
 
+export function withLoadingTimeout<T>(promise: Promise<T>, timeoutMs = 10000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Tempo limite ao carregar dados hidráulicos.')), timeoutMs)
+    void promise.then(resolve, reject).finally(() => clearTimeout(timeout))
+  })
+}
+
 export function useDmcs() {
   const enabled = useRealMode()
-  const loader = useCallback(() => referenceDataService.listDmcs(), [])
+  const loader = useCallback(() => withLoadingTimeout(referenceDataService.listDmcs()), [])
   return useReferenceQuery<DmcRow[]>(loader, EMPTY_ROWS, enabled)
 }
 
@@ -61,7 +68,7 @@ export function useDmcSeries() {
 
 export function useHydraulicOverview() {
   const enabled = useRealMode()
-  const loader = useCallback(() => hydraulicDiagnosticsService.listLatestMonthly(), [])
+  const loader = useCallback(() => withLoadingTimeout(hydraulicDiagnosticsService.listLatestMonthly()), [])
   return useReferenceQuery<DmcHydraulicMonthlyRow[]>(loader, EMPTY_ROWS, enabled)
 }
 

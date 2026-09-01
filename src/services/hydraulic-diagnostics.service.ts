@@ -14,12 +14,12 @@ async function latestRunId(): Promise<string | null> {
 
 export const hydraulicDiagnosticsService = {
   async listLatestMonthly(): Promise<DmcHydraulicMonthlyRow[]> {
-    const runId = await latestRunId()
-    if (!runId) return []
-    const { data, error } = await client().from('dmc_hydraulic_monthly').select('*').eq('analysis_run_id', runId).order('competence', { ascending: false })
+    const { data, error } = await client().from('dmc_hydraulic_monthly').select('*').order('created_at', { ascending: false })
     if (error) throw error
+    const runId = data?.[0]?.analysis_run_id
+    if (!runId) return []
     const latest = new Map<string, DmcHydraulicMonthlyRow>()
-    ;(data as DmcHydraulicMonthlyRow[]).forEach((row) => { if (!latest.has(row.dmc_id)) latest.set(row.dmc_id, row) })
+    ;(data as DmcHydraulicMonthlyRow[]).forEach((row) => { if (row.analysis_run_id === runId && !latest.has(row.dmc_id)) latest.set(row.dmc_id, row) })
     return [...latest.values()]
   },
 
