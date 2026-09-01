@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
-import type { DataImportRow } from '../types/database.types'
+import type { DataImportRow, ImportOperationalSummary } from '../types/database.types'
 import { IMPORT_ALGORITHM_VERSION, serializeMappings } from '../features/imports/parser'
+import { calculateCoverage, readImportDescriptor, summarizeFlags, type ImportFlagRecord } from '../features/imports/operational-summary'
 import type { ColumnMapping, ImportSource, ObjectiveFlag, PrevalidationResult } from '../features/imports/types'
 
 export const DEFAULT_IMPORT_BATCH_SIZE = 500
@@ -23,6 +24,44 @@ export async function listImports(): Promise<DataImportRow[]> {
   const { data, error } = await client().from('data_imports').select('*').order('imported_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as DataImportRow[]
+}
+
+export async function getImportSummary(item: DataImportRow): Promise<ImportOperationalSummary> {
+  const descriptor = readImportDescriptor(item)
+  const baseRaw = () => client().from('raw_measurements').select('raw_value').eq('import_id', item.id)
+  const [rawCountResult, minimumResult, maximumResult, flagsResult, rejectedResult] = await Promise.all([
+    client().from('raw_measurements').select('id', { count: 'exact', head: true }).eq('import_id', item.id),
+    baseRaw().not('raw_value', 'is', null).order('raw_value', { ascending: true }).limit(1).maybeSingle(),
+    baseRaw().not('raw_value', 'is', null).order('raw_value', { ascending: false }).limit(1).maybeSingle(),
+    client().from('measurement_quality_flags').select('flag_type,severity,details,raw_measurements!inner(import_id)').eq('raw_measurements.import_id', item.id),
+    client().from('import_rejected_rows').select('id', { count: 'exact', head: true }).eq('import_id', item.id),
+  ])
+  const error = rawCountResult.error ?? minimumResult.error ?? maximumResult.error ?? flagsResult.error ?? rejectedResult.error
+  if (error) throw error
+  const rawCount = rawCountResult.count ?? 0
+  const quality = summarizeFlags((flagsResult.data ?? []) as unknown as ImportFlagRecord[])
+  return {
+    import: item,
+    channelType: descriptor.channelType,
+    rawUnit: descriptor.rawUnit,
+    normalizedUnit: descriptor.normalizedUnit,
+    firstReading: descriptor.firstReading,
+    lastReading: descriptor.lastReading,
+    rawCount,
+    minimum: minimumResult.data?.raw_value === null || minimumResult.data?.raw_value === undefined ? null : Number(minimumResult.data.raw_value),
+    maximum: maximumResult.data?.raw_value === null || maximumResult.data?.raw_value === undefined ? null : Number(maximumResult.data.raw_value),
+    flags: quality.total,
+    flagBreakdown: quality.breakdown,
+    gaps: quality.gaps,
+    missingTimestamps: quality.missingTimestamps,
+    coveragePercent: calculateCoverage(descriptor.firstReading, descriptor.lastReading, descriptor.cadenceMinutes, rawCount),
+    rejections: rejectedResult.count ?? item.rejected_count,
+  }
+}
+
+export async function listImportSummaries(): Promise<ImportOperationalSummary[]> {
+  const imports = (await listImports()).filter((item) => item.source_type === 'SUPPLY_OUTLET')
+  return Promise.all(imports.map(getImportSummary))
 }
 
 function batches<T>(values: T[], size: number): T[][] {
@@ -49,7 +88,7 @@ export interface ExecuteImportInput {
 
 export async function executeImport(input: ExecuteImportInput): Promise<DataImportRow> {
   const existing = await findExistingImport(input.hash, input.source)
-  if (existing) throw new Error(`Este arquivo já foi importado neste contexto. Importação: ${existing.id} · ${existing.status}`)
+  if (existing) throw new Error('Este arquivo já foi importado.')
   const extension = input.file.name.split('.').pop()?.toLowerCase() ?? ''
   const importId = crypto.randomUUID()
   const safeName = input.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_')

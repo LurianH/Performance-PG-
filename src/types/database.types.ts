@@ -141,3 +141,27 @@ export interface DataImportRow {
   file_extension: string | null
   mime_type: string | null
 }
+
+export interface ImportQualityBreakdown {
+  type: string
+  severity: string
+  count: number
+}
+
+export interface ImportOperationalSummary {
+  import: DataImportRow
+  channelType: 'PRESSURE_SUPPLY' | 'FLOW' | '—'
+  rawUnit: string
+  normalizedUnit: string | null
+  firstReading: string | null
+  lastReading: string | null
+  rawCount: number
+  minimum: number | null
+  maximum: number | null
+  flags: number
+  flagBreakdown: ImportQualityBreakdown[]
+  gaps: number
+  missingTimestamps: number
+  coveragePercent: number | null
+  rejections: number
+}
