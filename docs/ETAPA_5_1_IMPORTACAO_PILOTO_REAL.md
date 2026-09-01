@@ -52,3 +52,29 @@ O `ZERO_STREAK` representa 13 leituras zero, permanece WARNING para revisão e n
 No cruzamento exploratório não persistente com `PRESSURE_SUPPLY / REDE`, foram encontrados 27.021 timestamps coincidentes: 92,5884% sobre a união das séries, 97,6933% da série de pressão e 94,6577% da série de vazão. Há 638 timestamps somente com pressão e 1.525 somente com vazão. A pressão possui 26 gaps e a vazão 1 gap. Nenhum `analysis_run`, CPE, IAL, IPS ou classificação causal foi criado.
 
 A idempotência reconheceu exatamente um import para o mesmo hash/origem/REDE e uma tentativa transacional duplicada foi bloqueada sem criar terceiro import. UPDATE e DELETE do RAW deste piloto foram igualmente bloqueados em transação com rollback. Status final: concluído e validado.
+
+## PILOTO 03 — PRESSÃO XIXOVA
+
+- Arquivo: `pressao xixova.csv`
+- SHA-256 abreviado: `60932a50e18ce579…`
+- Import ID: `f2293cbe-4c60-4a52-a2dc-fe532edc9f42`
+- Status: `COMPLETED`
+- Origem: `SUPPLY_OUTLET / XIXOVA`, sem DMC
+- Cabeçalho: não possui (`has_header = false`, confiança alta)
+- Encoding/delimitador: UTF-8 / `;`
+- Timezone: `America/Sao_Paulo`
+- Mapeamento: Coluna 1 = `TIMESTAMP`; Coluna 2 = `PRESSURE_SUPPLY`, `mca`; Coluna 3 vazia = `IGNORE`
+- Período: 01/11/2025 00:00 a 31/08/2026 23:45
+- Linhas físicas/dados/RAW: 26.831 / 26.831 / 26.831
+- Rejeições: 0
+- Flags: 92 (`MISSING_TIMESTAMP`: 91; `ZERO_STREAK`: 1; demais: 0)
+- Gaps: 91; 2.353 timestamps estimados ausentes no total
+- Maior gap: 08/07/2026 13:00 a 21/07/2026 17:00; 18.960 minutos; 1.263 timestamps esperados ausentes
+- Duplicidades/nulos/erros numéricos: 0 / 0 / 0
+- Mínimo/máximo RAW: 0,00 / 35,05 mca
+
+Todas as 26.831 leituras foram preservadas como `PRESSURE_SUPPLY`: `raw_value = normalized_value`, `raw_unit = normalized_unit = mca`. Nenhuma leitura foi invalidada por ausência de `equipment_period`. A sequência de quatro zeros permanece válida e recebe apenas WARNING para revisão.
+
+Os sanity checks foram confirmados no RAW e na view: 01/11/2025 às 00:00 = 17,33; 00:15 = 10,87; 00:30 = 3,81; 00:45 = 3,90; 04:00 = 11,34; 04:30 = 13,38; 04:45 = 14,49; 05:00 = 17,50 mca. Também foram confirmados 02/11 00:15 = 3,27; 03/11 13:30 = 1,54; 25/11 00:30 = 2,84; 30/11 00:15 = 3,18 mca. A leitura isolada de 1,54 mca permanece válida e não foi classificada como PC, erro ou outlier.
+
+O original de 746.364 bytes, MIME `text/csv`, foi preservado sem upsert no bucket privado `hydraulic-imports`. Idempotência e UPDATE/DELETE do RAW foram testados em transação com rollback: a duplicação foi bloqueada e as 26.831 medições permaneceram intactas. Nenhuma vazão XIXOVA, análise, expurgo, CPE, IAL, IPS ou classificação causal foi criada. Pressão XIXOVA está disponível e aguarda FLOW XIXOVA para futuro cruzamento P/Q.
