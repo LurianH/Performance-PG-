@@ -33,6 +33,14 @@ describe('parser RAW', () => {
   it('preserva zero e o mantém apenas como revisão', () => { const result = prevalidate(table([['01/01/2026 00:00','0'],['01/01/2026 00:15','0'],['01/01/2026 00:30','0'],['01/01/2026 00:45','0']]), mappings()); expect(result.measurements.every((item) => item.rawValue === 0)).toBe(true); expect(result.flags.find((flag) => flag.flagType === 'ZERO_STREAK')?.severity).toBe('WARNING') })
   it('não transforma NULL em zero', () => { const result = prevalidate(table([['01/01/2026 00:00','']]), mappings()); expect(result.measurements[0].rawValue).toBeNull(); expect(result.flags[0].flagType).toBe('NULL_VALUE') })
   it('registra gap sem inventar leitura', () => { const result = prevalidate(table([['01/01/2026 00:00','1'],['01/01/2026 00:15','2'],['01/01/2026 01:00','3']]), mappings()); expect(result.measurements).toHaveLength(3); expect(result.gapCount).toBe(1); expect(result.flags.some((flag) => flag.flagType === 'MISSING_TIMESTAMP')).toBe(true) })
+  it('registra o mesmo gap temporal em cada canal mapeado', () => {
+    const multiChannelTable: ParsedTable = { headers: ['Data e hora', 'PC', 'Vazão'], rows: [['01/01/2026 00:00','1','10'],['01/01/2026 00:15','2','20'],['01/01/2026 01:00','3','30']], encoding: 'UTF-8', delimiter: ';', hasHeader: true, physicalRowCount: 4, suggestedHeaderMode: 'PRESENT', headerConfidence: 'HIGH' }
+    const multiChannelMappings: ColumnMapping[] = [mappings()[0], mappings()[1], { index: 2, headerOriginal: 'Vazão', displayName: 'Vazão', headerNormalized: 'vazao', channelType: 'FLOW', unit: 'm3_h', confidence: 'HIGH' }]
+    const result = prevalidate(multiChannelTable, multiChannelMappings)
+    const gapFlags = result.flags.filter((flag) => flag.flagType === 'MISSING_TIMESTAMP')
+    expect(result.gapCount).toBe(1)
+    expect(gapFlags.map((flag) => flag.columnIndex)).toEqual([1, 2])
+  })
   it('preserva duplicidades internas', () => { const result = prevalidate(table([['01/01/2026 00:00','1'],['01/01/2026 00:00','2']]), mappings()); expect(result.measurements).toHaveLength(2); expect(result.duplicateCount).toBe(1); expect(result.flags.find((flag) => flag.flagType === 'DUPLICATE')?.details.conflictingValue).toBe(true) })
   it('rejeita timestamp inválido com payload rastreável', () => { const result = prevalidate(table([['data impossível','7']]), mappings()); expect(result.measurements).toHaveLength(0); expect(result.rejectedRows[0]).toMatchObject({ rowNumber: 2, reasonCode: 'INVALID_TIMESTAMP' }) })
   it('forma chave idempotente por hash, origem e escopo', () => expect(importContextKey('abc','DMC','dmc-1')).toBe('abc|DMC|dmc-1'))

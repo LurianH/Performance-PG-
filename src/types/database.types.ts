@@ -120,6 +120,10 @@ export interface SupplySeriesSummary {
   coveragePercent: number | null
 }
 
+export interface DmcSeriesSummary extends Omit<SupplySeriesSummary, 'supplyGroup'> {
+  dmcId: string
+}
+
 export interface DataImportRow {
   id: string
   filename: string

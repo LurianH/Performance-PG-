@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { DataImportRow, DmcCoverage, DmcRow, PerformanceContractParameterRow, ReferenceCounts, SupplySeriesSummary, TechnicalParameterRow } from '../types/database.types'
+import type { DataImportRow, DmcCoverage, DmcRow, DmcSeriesSummary, PerformanceContractParameterRow, ReferenceCounts, SupplySeriesSummary, TechnicalParameterRow } from '../types/database.types'
 import { normalizeMeasurement } from '../features/hydraulics/domain-rules'
 
 function client() {
@@ -62,5 +62,29 @@ export const referenceDataService = {
       const normalizedUnit = normalizeMeasurement(null, channelType, unit).unit
       return { importId: item.id, supplyGroup: item.supply_group!, channelType, unit, normalizedUnit, firstReading, lastReading, rawCount, gapCount: gapCount ?? 0, cadenceMinutes, coveragePercent: expected ? Math.min(100, rawCount / expected * 100) : null }
     }))
+  },
+  async getDmcSeries(): Promise<DmcSeriesSummary[]> {
+    const imports = (await rows<DataImportRow>('data_imports', '*', 'imported_at')).filter((item) => item.source_type === 'DMC' && item.status === 'COMPLETED' && item.dmc_id)
+    const summaries = await Promise.all(imports.flatMap((item) => {
+      const metadata = (item.metadata_json ?? {}) as Record<string, unknown>
+      const mapping = Array.isArray(item.mapping_json) ? item.mapping_json as Array<Record<string, unknown>> : []
+      const channels = mapping.filter((entry) => entry.channel_type !== 'TIMESTAMP' && entry.channel_type !== 'IGNORE')
+      return channels.map(async (channel): Promise<DmcSeriesSummary> => {
+        const channelType = String(channel.channel_type ?? '—')
+        const unit = String(channel.unit ?? '—')
+        const firstReading = String(metadata.first_reading ?? '')
+        const lastReading = String(metadata.last_reading ?? '')
+        const cadenceMinutes = typeof metadata.predominant_cadence_minutes === 'number' ? metadata.predominant_cadence_minutes : null
+        const rawQuery = client().from('raw_measurements').select('id', { count: 'exact', head: true }).eq('import_id', item.id).eq('channel_type', channelType)
+        const gapQuery = client().from('measurement_quality_flags').select('id,raw_measurements!inner(import_id,channel_type)', { count: 'exact', head: true }).eq('flag_type', 'MISSING_TIMESTAMP').eq('raw_measurements.import_id', item.id).eq('raw_measurements.channel_type', channelType)
+        const [rawResult, gapResult] = await Promise.all([rawQuery, gapQuery])
+        const error = rawResult.error ?? gapResult.error
+        if (error) throw error
+        const rawCount = rawResult.count ?? 0
+        const expected = cadenceMinutes && firstReading && lastReading ? Math.round((Date.parse(lastReading) - Date.parse(firstReading)) / 60000 / cadenceMinutes) + 1 : null
+        return { importId: item.id, dmcId: item.dmc_id!, channelType, unit, normalizedUnit: normalizeMeasurement(null, channelType, unit).unit, firstReading, lastReading, rawCount, gapCount: gapResult.count ?? 0, cadenceMinutes, coveragePercent: expected ? Math.min(100, rawCount / expected * 100) : null }
+      })
+    }))
+    return summaries
   },
 }

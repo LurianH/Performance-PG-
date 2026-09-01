@@ -178,6 +178,12 @@ export function prevalidate(table: ParsedTable, mappings: ColumnMapping[], zeroS
   const frequencies = new Map<number, number>(); deltas.forEach((delta) => frequencies.set(delta, (frequencies.get(delta) ?? 0) + 1))
   const cadence = [...frequencies.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
   const gaps = cadence ? deltas.map((delta, index) => ({ delta, index })).filter(({ delta }) => delta > cadence) : []
-  gaps.forEach(({ delta, index }) => { const firstAfter = measurements.find((item) => Date.parse(item.measuredAt) === sorted[index + 1]); if (firstAfter) flags.push({ rowNumber: firstAfter.rowNumber, columnIndex: firstAfter.columnIndex, flagType: 'MISSING_TIMESTAMP', severity: 'WARNING', details: { gapStart: new Date(sorted[index]).toISOString(), gapEnd: new Date(sorted[index + 1]).toISOString(), expectedIntervalMinutes: cadence, missingCount: Math.max(0, Math.round(delta / cadence!) - 1) } }) })
+  gaps.forEach(({ delta, index }) => {
+    const firstTimestampAfterGap = sorted[index + 1]
+    channels.forEach((mapping) => {
+      const firstAfter = measurements.find((item) => item.columnIndex === mapping.index && Date.parse(item.measuredAt) === firstTimestampAfterGap)
+      if (firstAfter) flags.push({ rowNumber: firstAfter.rowNumber, columnIndex: firstAfter.columnIndex, flagType: 'MISSING_TIMESTAMP', severity: 'WARNING', details: { gapStart: new Date(sorted[index]).toISOString(), gapEnd: new Date(firstTimestampAfterGap).toISOString(), expectedIntervalMinutes: cadence, missingCount: Math.max(0, Math.round(delta / cadence!) - 1) } })
+    })
+  })
   return { measurements, rejectedRows, flags, sourceRowCount: table.rows.length, physicalRowCount: table.physicalRowCount, validTimestampCount: table.rows.length - rejectedRows.length, invalidTimestampCount: rejectedRows.length, mappedChannelCount: channels.length, validNumericCount, nullValueCount, numericParseErrorCount, duplicateCount: flags.filter((flag) => flag.flagType === 'DUPLICATE').length, predominantCadenceMinutes: cadence, gapCount: gaps.length, largestGapMinutes: gaps.length ? Math.max(...gaps.map((gap) => gap.delta)) : null, firstReading: sorted.length ? new Date(sorted[0]).toISOString() : null, lastReading: sorted.length ? new Date(sorted[sorted.length - 1]).toISOString() : null }
 }

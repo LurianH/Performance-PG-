@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useAuth } from '../features/auth/useAuth'
 import { referenceDataService } from '../services/reference-data.service'
-import type { DataImportRow, DmcCoverage, DmcRow, PerformanceContractParameterRow, ReferenceCounts, SupplySeriesSummary, TechnicalParameterRow } from '../types/database.types'
+import type { DataImportRow, DmcCoverage, DmcRow, DmcSeriesSummary, PerformanceContractParameterRow, ReferenceCounts, SupplySeriesSummary, TechnicalParameterRow } from '../types/database.types'
 import { useReferenceQuery } from './useReferenceQuery'
 
 const EMPTY_ROWS: never[] = []
@@ -49,6 +49,12 @@ export function useSupplySeries() {
   const enabled = useRealMode()
   const loader = useCallback(() => referenceDataService.getSupplySeries(), [])
   return useReferenceQuery<SupplySeriesSummary[]>(loader, EMPTY_ROWS, enabled)
+}
+
+export function useDmcSeries() {
+  const enabled = useRealMode()
+  const loader = useCallback(() => referenceDataService.getDmcSeries(), [])
+  return useReferenceQuery<DmcSeriesSummary[]>(loader, EMPTY_ROWS, enabled)
 }
 
 export function useOfficialEmptyStates() {
