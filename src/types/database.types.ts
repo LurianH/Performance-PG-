@@ -47,7 +47,7 @@ export interface ValidatedMeasurementRow {
   raw_value: number | null
   normalized_value: number | null
   raw_unit: string
-  normalized_unit: string
+  normalized_unit: string | null
   is_valid: boolean
   quality_status: string
   exclusion_reason: string | null
@@ -111,6 +111,7 @@ export interface SupplySeriesSummary {
   supplyGroup: SupplyGroup
   channelType: string
   unit: string
+  normalizedUnit: 'l_s' | 'mca' | null
   firstReading: string
   lastReading: string
   rawCount: number

@@ -23,8 +23,8 @@ select pg_temp.assert_true((select count(*) = 3 from public.performance_contract
 select pg_temp.assert_true((select count(*) = 7 from public.technical_parameters where effective_to is null), '7 parâmetros técnicos ativos');
 select pg_temp.assert_true((select count(*) = 0 from public.performance_months), 'sem competências oficiais');
 select pg_temp.assert_true((select count(*) = 0 from public.projection_scenarios), 'sem cenários');
-select pg_temp.assert_true((select count(*) = 0 from public.raw_measurements), 'RAW vazio');
-select pg_temp.assert_true((select count(*) = 0 from public.data_imports), 'sem importações');
+-- Imports e RAW passam a existir nos pilotos controlados da ETAPA 5.
+-- Suas contagens são verificadas nos checkpoints específicos, não neste teste de referência.
 select pg_temp.assert_true((select count(*) = 0 from public.equipment_periods), 'sem vigências de equipamento');
 
 select 'reference_data_passed' as result;

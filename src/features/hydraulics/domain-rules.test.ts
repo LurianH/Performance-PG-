@@ -6,6 +6,7 @@ import {
   evaluateMeasurementEligibility,
   isEquipmentAvailable,
   litersPerSecondToCubicMetersPerHour,
+  normalizeMeasurement,
 } from './domain-rules'
 
 describe('regras puras do diagnóstico hidráulico', () => {
@@ -29,6 +30,22 @@ describe('regras puras do diagnóstico hidráulico', () => {
   it('converte L/s e m³/h de forma reversível', () => {
     expect(litersPerSecondToCubicMetersPerHour(10)).toBeCloseTo(36)
     expect(cubicMetersPerHourToLitersPerSecond(36)).toBeCloseTo(10)
+  })
+
+  it.each([
+    [360, 'FLOW', 'm3_h', 100, 'l_s'],
+    [2075.05, 'FLOW', 'm3_h', 576.4027777777778, 'l_s'],
+    [1, 'FLOW', 'l_s', 1, 'l_s'],
+    [0, 'FLOW', 'm3_h', 0, 'l_s'],
+    [null, 'FLOW', 'm3_h', null, 'l_s'],
+    [25, 'PRESSURE_SUPPLY', 'mca', 25, 'mca'],
+    [99, 'FLOW', 'raw', null, null],
+  ] as const)('normaliza %s %s/%s sem inventar conversão', (raw, channel, unit, expected, expectedUnit) => {
+    const result = normalizeMeasurement(raw, channel, unit)
+    if (expected === null) expect(result.value).toBeNull()
+    else expect(result.value).toBeCloseTo(expected, 10)
+    expect(result.unit).toBe(expectedUnit)
+    expect(raw).toBe(raw)
   })
 
   it('classifica equipamento indisponível', () => {

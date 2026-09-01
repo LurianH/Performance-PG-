@@ -19,6 +19,18 @@ Para DMC, o `supply_group` é derivado do cadastro e não é persistido no RAW. 
 
 Arquivos podem conter qualquer subconjunto válido. Booster Ocian aceita somente timestamp + PC. Saídas podem conter apenas pressão ou apenas vazão. RAW preserva unidade original (`mca`, `m3_h`, `l_s` ou `raw`).
 
+## Normalização hidráulica
+
+**Unidade canônica normalizada de vazão do Performance Praia Grande: L/s.** A camada `validated_measurements` preserva `raw_value` e `raw_unit` e aplica somente na projeção validada:
+
+- m³/h → L/s: dividir por 3,6;
+- L/s → m³/h: multiplicar por 3,6 apenas quando uma conversão de apresentação explicitamente exigir, nunca como normalização canônica;
+- FLOW já em L/s permanece L/s;
+- pressão em mca permanece mca;
+- unidade ausente, desconhecida ou incompatível com o canal não é convertida: os campos normalizados ficam NULL e o RAW continua disponível.
+
+NULL permanece NULL e zero permanece zero. A view não arredonda valores; formatação decimal pertence ao frontend.
+
 ## Idempotência, rejeições e duplicidades
 
 A verificação usa hash + tipo de origem + DMC/saída. Arquivo já existente no mesmo contexto é bloqueado e deve seguir para reprocessamento. `import_processing_runs` cria histórico sem duplicar arquivo lógico ou RAW.

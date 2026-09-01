@@ -181,8 +181,9 @@ select pg_temp.assert_true(
 
 select pg_temp.assert_true(
   not (select is_valid from public.validated_measurements where measurement_id = '40000000-0000-0000-0000-000000000004')
-  and (select normalized_value = 0 from public.validated_measurements where measurement_id = '40000000-0000-0000-0000-000000000004'),
-  'NOT_INSTALLED must be invalid while preserving, not inventing, the raw zero'
+  and (select raw_value = 0 and normalized_value is null and normalized_unit is null
+       from public.validated_measurements where measurement_id = '40000000-0000-0000-0000-000000000004'),
+  'NOT_INSTALLED must be invalid while preserving raw zero and not normalizing an unknown unit'
 );
 
 insert into public.performance_months (id, competence, vd, vcm, status, source, created_by)

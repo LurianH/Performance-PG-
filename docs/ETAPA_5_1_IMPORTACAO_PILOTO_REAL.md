@@ -22,3 +22,9 @@
 Sanity checks aprovados: primeira leitura 01/11/2025 00:00 = 25,00 mca; segunda 00:15 = 25,08 mca; linha 13.830 em 26/03/2026 08:30 = 25,39 mca; última em 31/08/2026 18:00 = 24,86 mca. A primeira linha foi preservada. A view validada manteve valor/unidade, sem invalidação artificial.
 
 A idempotência encontrou exatamente um import para o mesmo hash/origem/contexto, sem segunda confirmação ou duplicação. UPDATE e DELETE de RAW foram bloqueados no teste transacional de RLS. O arquivo original permanece no bucket privado `hydraulic-imports`; nenhum expurgo ou resultado CPE/IAL/IPS foi criado.
+
+## Preparação do PILOTO 02 — VAZÃO REDE
+
+Antes da importação, a normalização foi corrigida por migration aditiva. **Unidade canônica normalizada de vazão do Performance Praia Grande: L/s.** FLOW em `m3_h` é dividido por 3,6; FLOW em `l_s` permanece inalterado. A view `validated_measurements` nunca modifica RAW e não inventa conversão para unidade incompatível.
+
+Pré-validação repetida sem upload: `vazao rede.csv`, SHA-256 `6d95f51adeeded2d…`, sem cabeçalho (confiança alta), UTF-8, delimitador `;`, período local de 01/11/2025 00:00 a 31/08/2026 23:45, 28.546 linhas físicas, 28.546 timestamps válidos, nenhuma rejeição, duplicidade, nulidade ou erro numérico, 1 gap e 28.546 RAW previstos. Origem prevista: `SUPPLY_OUTLET / REDE`, sem DMC; canal `FLOW`; RAW `m3_h`; normalizado `l_s`. A importação permanece não confirmada.

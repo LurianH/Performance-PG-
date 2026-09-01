@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { DataImportRow, DmcCoverage, DmcRow, PerformanceContractParameterRow, ReferenceCounts, SupplySeriesSummary, TechnicalParameterRow } from '../types/database.types'
+import { normalizeMeasurement } from '../features/hydraulics/domain-rules'
 
 function client() {
   if (!supabase) throw new Error('Supabase não configurado')
@@ -56,7 +57,10 @@ export const referenceDataService = {
       const { count: gapCount, error } = await client().from('measurement_quality_flags').select('id,raw_measurements!inner(import_id)', { count: 'exact', head: true }).eq('flag_type', 'MISSING_TIMESTAMP').eq('raw_measurements.import_id', item.id)
       if (error) throw error
       const expected = cadenceMinutes && firstReading && lastReading ? Math.round((Date.parse(lastReading) - Date.parse(firstReading)) / 60000 / cadenceMinutes) + 1 : null
-      return { importId: item.id, supplyGroup: item.supply_group!, channelType: String(channel?.channel_type ?? '—'), unit: String(channel?.unit ?? '—'), firstReading, lastReading, rawCount, gapCount: gapCount ?? 0, cadenceMinutes, coveragePercent: expected ? Math.min(100, rawCount / expected * 100) : null }
+      const channelType = String(channel?.channel_type ?? '—')
+      const unit = String(channel?.unit ?? '—')
+      const normalizedUnit = normalizeMeasurement(null, channelType, unit).unit
+      return { importId: item.id, supplyGroup: item.supply_group!, channelType, unit, normalizedUnit, firstReading, lastReading, rawCount, gapCount: gapCount ?? 0, cadenceMinutes, coveragePercent: expected ? Math.min(100, rawCount / expected * 100) : null }
     }))
   },
 }
