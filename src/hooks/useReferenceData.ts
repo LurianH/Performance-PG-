@@ -74,10 +74,11 @@ export function useHydraulicOverview() {
 
 export function useHydraulicDmcDetail(dmcId: string | undefined) {
   const enabled = useRealMode() && Boolean(dmcId)
-  const loader = useCallback(() => dmcId ? hydraulicDiagnosticsService.getDmcDetail(dmcId) : Promise.resolve({ daily: [], monthly: [] }), [dmcId])
-  return useReferenceQuery<{ daily: DmcHydraulicDailyRow[]; monthly: DmcHydraulicMonthlyRow[] }>(loader, { daily: [], monthly: [] }, enabled)
+  const loader = useCallback(() => dmcId ? withLoadingTimeout(hydraulicDiagnosticsService.getDmcDetail(dmcId)) : Promise.resolve(EMPTY_HYDRAULIC_DETAIL), [dmcId])
+  return useReferenceQuery<{ daily: DmcHydraulicDailyRow[]; monthly: DmcHydraulicMonthlyRow[] }>(loader, EMPTY_HYDRAULIC_DETAIL, enabled)
 }
 
+const EMPTY_HYDRAULIC_DETAIL: { daily: DmcHydraulicDailyRow[]; monthly: DmcHydraulicMonthlyRow[] } = { daily: [], monthly: [] }
 const EMPTY_CONTRACT: ContractDashboardData = { months: [], projections: [], scenario: null, baseline: 0, targetReduction100: 0, referenceReduction120: 0 }
 export function useContractDashboard() {
   const enabled = useRealMode()
