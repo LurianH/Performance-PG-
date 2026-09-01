@@ -18,8 +18,22 @@ describe('parser RAW', () => {
   it('sugere ausência de cabeçalho pela estrutura das linhas', () => expect(detectHeaderMode([['01/11/2025 00:00','25.00'],['01/11/2025 00:15','25.08'],['01/11/2025 00:30','3.27']])).toEqual({ suggestedMode: 'ABSENT', confidence: 'HIGH' }))
   it('permite sobrescrever a sugestão sem descartar silenciosamente', () => { const text = '01/11/2025 00:00;25.00\n01/11/2025 00:15;25.08'; expect(parseDelimitedText(text, ';', 'UTF-8', 'AUTO').rows).toHaveLength(2); expect(parseDelimitedText(text, ';', 'UTF-8', 'PRESENT').rows).toHaveLength(1) })
   it('gera nomes neutros para arquivo sem cabeçalho', () => expect(parseDelimitedText('01/11/2025 00:00;25.00', ';', 'UTF-8', 'ABSENT').headers).toEqual(['Coluna 1', 'Coluna 2']))
-  it.each([['12,34',12.34],['12.34',12.34],[12.34,12.34],['',null]])('interpreta decimal seguro', (input, expected) => expect(parseLocaleNumber(input)).toBe(expected))
-  it('recusa separadores ambíguos', () => expect(parseLocaleNumber('1.234,56')).toBeUndefined())
+  it.each([
+    ['9.49', 9.49],
+    ['375.68408', 375.68408],
+    ['0.00', 0],
+    ['1,25', 1.25],
+    ['12,34', 12.34],
+    ['12.34', 12.34],
+    [12.34, 12.34],
+    ['', null],
+  ])('interpreta decimal sem remover o separador indiscriminadamente', (input, expected) => expect(parseLocaleNumber(input)).toBe(expected))
+  it.each([['1.234,56', 1234.56], ['1,234.56', 1234.56], ['1.234.567', 1234567], ['1,234,567', 1234567]])('remove separador de milhar apenas em agrupamento inequívoco', (input, expected) => expect(parseLocaleNumber(input)).toBe(expected))
+  it.each(['1.23.45', '1,23,45', '12.34,56', 'valor'])('recusa agrupamento numérico inválido', (input) => expect(parseLocaleNumber(input)).toBeUndefined())
+  it('preserva texto decimal no payload RAW e usa o número interpretado na medição', () => {
+    const result = prevalidate(table([['01/01/2026 00:00', '375.68408']]), mappings('FLOW', 'm3_h'))
+    expect(result.measurements[0]).toMatchObject({ rawValue: 375.68408, unit: 'm3_h', rawPayload: { '1:Pressão 1 (mca)': '375.68408' } })
+  })
   it.each([['01/01/2026 12:30','2026-01-01T15:30:00.000Z'],['01/01/2026 12:30:45','2026-01-01T15:30:45.000Z']])('interpreta horário local de São Paulo', (input, expected) => expect(parseLocalTimestamp(input)).toBe(expected))
   it('interpreta Date de célula Excel como componentes locais', () => expect(parseLocalTimestamp(new Date(Date.UTC(2026, 0, 1, 12, 30)))).toBe('2026-01-01T15:30:00.000Z'))
   it('gera hash estável sobre bytes', async () => { const bytes = new TextEncoder().encode('fixture').buffer; expect(await sha256Hex(bytes)).toBe(await sha256Hex(bytes)) })

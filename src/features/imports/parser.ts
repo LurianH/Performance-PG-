@@ -91,8 +91,33 @@ export function parseLocaleNumber(input: unknown): number | null | undefined {
   if (input === null || input === undefined || String(input).trim() === '') return null
   if (typeof input === 'number') return Number.isFinite(input) ? input : undefined
   const value = String(input).trim().replace(/\s/g, '')
-  if (!/^[+-]?\d+(?:[.,]\d+)?$/.test(value)) return undefined
-  const parsed = Number(value.replace(',', '.'))
+  if (!/^[+-]?\d[\d.,]*$/.test(value)) return undefined
+  const sign = /^[+-]/.test(value) ? value[0] : ''
+  const unsigned = sign ? value.slice(1) : value
+  const dots = unsigned.match(/\./g)?.length ?? 0
+  const commas = unsigned.match(/,/g)?.length ?? 0
+  let normalized: string
+
+  if (dots > 0 && commas > 0) {
+    const decimalSeparator = unsigned.lastIndexOf('.') > unsigned.lastIndexOf(',') ? '.' : ','
+    const thousandsSeparator = decimalSeparator === '.' ? ',' : '.'
+    const decimalIndex = unsigned.lastIndexOf(decimalSeparator)
+    const integerPart = unsigned.slice(0, decimalIndex)
+    const fractionPart = unsigned.slice(decimalIndex + 1)
+    const groupedInteger = new RegExp(`^\\d{1,3}(?:\\${thousandsSeparator}\\d{3})+$`)
+    if (!fractionPart || (!/^\d+$/.test(integerPart) && !groupedInteger.test(integerPart)) || !/^\d+$/.test(fractionPart)) return undefined
+    normalized = `${integerPart.replaceAll(thousandsSeparator, '')}.${fractionPart}`
+  } else {
+    const separator = dots === 1 ? '.' : commas === 1 ? ',' : null
+    if (separator) normalized = unsigned.replace(separator, '.')
+    else if (dots > 1 || commas > 1) {
+      const thousandsSeparator = dots > 1 ? '.' : ','
+      if (!new RegExp(`^\\d{1,3}(?:\\${thousandsSeparator}\\d{3})+$`).test(unsigned)) return undefined
+      normalized = unsigned.replaceAll(thousandsSeparator, '')
+    } else normalized = unsigned
+  }
+
+  const parsed = Number(`${sign}${normalized}`)
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
