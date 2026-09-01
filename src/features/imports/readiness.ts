@@ -12,6 +12,12 @@ type ReadinessInput = {
 
 export type ImportReadiness = { ready: boolean; reasons: string[] }
 
+export function mappingChannelOptions(sourceType: ImportSource['type'], supplyChannel: 'PRESSURE_SUPPLY' | 'FLOW' = 'PRESSURE_SUPPLY'): ColumnMapping['channelType'][] {
+  return sourceType === 'DMC'
+    ? ['IGNORE', 'TIMESTAMP', 'PRESSURE_PC', 'PRESSURE_UPSTREAM', 'PRESSURE_DOWNSTREAM', 'FLOW']
+    : ['IGNORE', 'TIMESTAMP', supplyChannel]
+}
+
 export function getImportReadiness(input: ReadinessInput): ImportReadiness {
   const reasons: string[] = []
   const { table, source, mappings } = input
@@ -23,8 +29,9 @@ export function getImportReadiness(input: ReadinessInput): ImportReadiness {
   if (table?.hasHeader === null) reasons.push('Confirme se a primeira linha é cabeçalho ou dado.')
   if (table?.encoding !== 'XLSX' && !table?.delimiter) reasons.push('O delimitador do arquivo texto não foi definido.')
   if (!source) reasons.push('A origem da série não foi selecionada.')
-  if (timestamps.length !== 1) reasons.push('Mapeie exatamente uma coluna como TIMESTAMP.')
-  if (dataChannels.length === 0) reasons.push('Mapeie ao menos uma coluna de medição.')
+  if (source?.type === 'DMC' && (timestamps.length !== 1 || dataChannels.length === 0)) reasons.push('Mapeie exatamente uma coluna como TIMESTAMP e pelo menos um canal de medição do DMC.')
+  if (source?.type !== 'DMC' && timestamps.length !== 1) reasons.push('Mapeie exatamente uma coluna como TIMESTAMP.')
+  if (source?.type !== 'DMC' && dataChannels.length === 0) reasons.push('Mapeie ao menos uma coluna de medição.')
   if (dataChannels.some((item) => !item.unit)) reasons.push('Confirme a unidade de todos os canais mapeados.')
 
   if (source?.type === 'SUPPLY_OUTLET') {
