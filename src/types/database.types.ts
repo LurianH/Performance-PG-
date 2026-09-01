@@ -154,11 +154,22 @@ export interface ImportQualityBreakdown {
 
 export interface ImportOperationalSummary {
   import: DataImportRow
-  channelType: 'PRESSURE_SUPPLY' | 'FLOW' | '—'
-  rawUnit: string
-  normalizedUnit: string | null
   firstReading: string | null
   lastReading: string | null
+  rawCount: number
+  flags: number
+  flagBreakdown: ImportQualityBreakdown[]
+  gaps: number
+  missingTimestamps: number
+  coveragePercent: number | null
+  rejections: number
+  channels: ImportChannelOperationalSummary[]
+}
+
+export interface ImportChannelOperationalSummary {
+  channelType: string
+  rawUnit: string
+  normalizedUnit: string | null
   rawCount: number
   minimum: number | null
   maximum: number | null
@@ -167,5 +178,4 @@ export interface ImportOperationalSummary {
   gaps: number
   missingTimestamps: number
   coveragePercent: number | null
-  rejections: number
 }

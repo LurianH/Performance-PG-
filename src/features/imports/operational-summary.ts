@@ -23,6 +23,15 @@ export function readImportDescriptor(item: DataImportRow) {
   } as const
 }
 
+export function readImportChannels(item: DataImportRow) {
+  const mappings = Array.isArray(item.mapping_json) ? item.mapping_json as Array<Record<string, unknown>> : []
+  return mappings.filter((entry) => !['TIMESTAMP', 'IGNORE'].includes(String(entry.channel_type))).map((entry) => {
+    const channelType = String(entry.channel_type ?? '—')
+    const rawUnit = typeof entry.unit === 'string' ? entry.unit : '—'
+    return { channelType, rawUnit, normalizedUnit: normalizeMeasurement(null, channelType, rawUnit).unit }
+  })
+}
+
 export function calculateCoverage(firstReading: string | null, lastReading: string | null, cadenceMinutes: number | null, rawCount: number): number | null {
   if (!firstReading || !lastReading || !cadenceMinutes || cadenceMinutes <= 0) return null
   const elapsedMinutes = (Date.parse(lastReading) - Date.parse(firstReading)) / 60_000

@@ -36,6 +36,16 @@ export function getImportReadiness(input: ReadinessInput): ImportReadiness {
     }
   }
 
+  if (source?.type === 'DMC') {
+    if (!source.dmc.id || !source.dmc.active) reasons.push('Selecione um DMC ativo válido.')
+    const allowed = ['PRESSURE_PC', 'PRESSURE_UPSTREAM', 'PRESSURE_DOWNSTREAM', 'FLOW']
+    if (dataChannels.some((item) => !allowed.includes(item.channelType))) reasons.push('DMC aceita somente canais de pressão do PC, montante, jusante e vazão.')
+    if (dataChannels.some((item) => item.channelType.startsWith('PRESSURE_') && item.unit !== 'mca')) reasons.push('Canais de pressão do DMC devem manter a unidade original mca.')
+    if (dataChannels.some((item) => item.channelType === 'FLOW' && !['m3_h', 'l_s'].includes(item.unit ?? ''))) reasons.push('Confirme a unidade original da vazão como m3_h ou l_s.')
+    const channelTypes = dataChannels.map((item) => item.channelType)
+    if (new Set(channelTypes).size !== channelTypes.length) reasons.push('Mapeie no máximo uma coluna para cada canal do DMC.')
+  }
+
   if (table && timestamps.length === 1 && !table.rows.some((row) => parseLocalTimestamp(row[timestamps[0].index]) !== null)) {
     reasons.push('Nenhum timestamp válido foi encontrado para gerar a prévia.')
   }

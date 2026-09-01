@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase'
-import type { DataImportRow, ImportOperationalSummary } from '../types/database.types'
+import type { DataImportRow, ImportChannelOperationalSummary, ImportOperationalSummary } from '../types/database.types'
 import { IMPORT_ALGORITHM_VERSION, serializeMappings } from '../features/imports/parser'
-import { calculateCoverage, readImportDescriptor, summarizeFlags, type ImportFlagRecord } from '../features/imports/operational-summary'
+import { calculateCoverage, readImportChannels, readImportDescriptor, summarizeFlags, type ImportFlagRecord } from '../features/imports/operational-summary'
 import type { ColumnMapping, ImportSource, ObjectiveFlag, PrevalidationResult } from '../features/imports/types'
 
 export const DEFAULT_IMPORT_BATCH_SIZE = 500
@@ -21,47 +21,68 @@ export async function findExistingImport(hash: string, source: ImportSource): Pr
 }
 
 export async function listImports(): Promise<DataImportRow[]> {
-  const { data, error } = await client().from('data_imports').select('*').order('imported_at', { ascending: false })
-  if (error) throw error
-  return (data ?? []) as DataImportRow[]
+  const values: DataImportRow[] = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client().from('data_imports').select('*').order('imported_at', { ascending: false }).range(from, from + pageSize - 1)
+    if (error) throw error
+    values.push(...(data ?? []) as DataImportRow[])
+    if ((data ?? []).length < pageSize) return values
+  }
+}
+
+async function listImportFlags(importId: string): Promise<Array<ImportFlagRecord & { raw_measurements: { channel_type: string } }>> {
+  const values: Array<ImportFlagRecord & { raw_measurements: { channel_type: string } }> = []
+  const pageSize = 500
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client().from('measurement_quality_flags').select('flag_type,severity,details,raw_measurements!inner(import_id,channel_type)').eq('raw_measurements.import_id', importId).range(from, from + pageSize - 1)
+    if (error) throw error
+    values.push(...(data ?? []) as unknown as Array<ImportFlagRecord & { raw_measurements: { channel_type: string } }>)
+    if ((data ?? []).length < pageSize) return values
+  }
 }
 
 export async function getImportSummary(item: DataImportRow): Promise<ImportOperationalSummary> {
   const descriptor = readImportDescriptor(item)
-  const baseRaw = () => client().from('raw_measurements').select('raw_value').eq('import_id', item.id)
-  const [rawCountResult, minimumResult, maximumResult, flagsResult, rejectedResult] = await Promise.all([
-    client().from('raw_measurements').select('id', { count: 'exact', head: true }).eq('import_id', item.id),
-    baseRaw().not('raw_value', 'is', null).order('raw_value', { ascending: true }).limit(1).maybeSingle(),
-    baseRaw().not('raw_value', 'is', null).order('raw_value', { ascending: false }).limit(1).maybeSingle(),
-    client().from('measurement_quality_flags').select('flag_type,severity,details,raw_measurements!inner(import_id)').eq('raw_measurements.import_id', item.id),
+  const descriptors = readImportChannels(item)
+  const [flagRows, rejectedResult] = await Promise.all([
+    listImportFlags(item.id),
     client().from('import_rejected_rows').select('id', { count: 'exact', head: true }).eq('import_id', item.id),
   ])
-  const error = rawCountResult.error ?? minimumResult.error ?? maximumResult.error ?? flagsResult.error ?? rejectedResult.error
-  if (error) throw error
-  const rawCount = rawCountResult.count ?? 0
-  const quality = summarizeFlags((flagsResult.data ?? []) as unknown as ImportFlagRecord[])
+  if (rejectedResult.error) throw rejectedResult.error
+  const channels = await Promise.all(descriptors.map(async (channel): Promise<ImportChannelOperationalSummary> => {
+    const baseRaw = () => client().from('raw_measurements').select('raw_value').eq('import_id', item.id).eq('channel_type', channel.channelType)
+    const [countResult, minimumResult, maximumResult] = await Promise.all([
+      client().from('raw_measurements').select('id', { count: 'exact', head: true }).eq('import_id', item.id).eq('channel_type', channel.channelType),
+      baseRaw().not('raw_value', 'is', null).order('raw_value', { ascending: true }).limit(1).maybeSingle(),
+      baseRaw().not('raw_value', 'is', null).order('raw_value', { ascending: false }).limit(1).maybeSingle(),
+    ])
+    const error = countResult.error ?? minimumResult.error ?? maximumResult.error
+    if (error) throw error
+    const rawCount = countResult.count ?? 0
+    const quality = summarizeFlags(flagRows.filter((row) => row.raw_measurements.channel_type === channel.channelType))
+    return { ...channel, rawCount, minimum: minimumResult.data?.raw_value == null ? null : Number(minimumResult.data.raw_value), maximum: maximumResult.data?.raw_value == null ? null : Number(maximumResult.data.raw_value), flags: quality.total, flagBreakdown: quality.breakdown, gaps: quality.gaps, missingTimestamps: quality.missingTimestamps, coveragePercent: calculateCoverage(descriptor.firstReading, descriptor.lastReading, descriptor.cadenceMinutes, rawCount) }
+  }))
+  const rawCount = channels.reduce((total, channel) => total + channel.rawCount, 0)
+  const quality = summarizeFlags(flagRows)
+  const coverageValues = channels.map((channel) => channel.coveragePercent).filter((value): value is number => value !== null)
   return {
     import: item,
-    channelType: descriptor.channelType,
-    rawUnit: descriptor.rawUnit,
-    normalizedUnit: descriptor.normalizedUnit,
     firstReading: descriptor.firstReading,
     lastReading: descriptor.lastReading,
     rawCount,
-    minimum: minimumResult.data?.raw_value === null || minimumResult.data?.raw_value === undefined ? null : Number(minimumResult.data.raw_value),
-    maximum: maximumResult.data?.raw_value === null || maximumResult.data?.raw_value === undefined ? null : Number(maximumResult.data.raw_value),
     flags: quality.total,
     flagBreakdown: quality.breakdown,
     gaps: quality.gaps,
     missingTimestamps: quality.missingTimestamps,
-    coveragePercent: calculateCoverage(descriptor.firstReading, descriptor.lastReading, descriptor.cadenceMinutes, rawCount),
+    coveragePercent: coverageValues.length ? coverageValues.reduce((total, value) => total + value, 0) / coverageValues.length : null,
     rejections: rejectedResult.count ?? item.rejected_count,
+    channels,
   }
 }
 
 export async function listImportSummaries(): Promise<ImportOperationalSummary[]> {
-  const imports = (await listImports()).filter((item) => item.source_type === 'SUPPLY_OUTLET')
-  return Promise.all(imports.map(getImportSummary))
+  return Promise.all((await listImports()).map(getImportSummary))
 }
 
 function batches<T>(values: T[], size: number): T[][] {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DataImportRow } from '../../types/database.types'
-import { calculateCoverage, readImportDescriptor, summarizeFlags } from './operational-summary'
+import { calculateCoverage, readImportChannels, readImportDescriptor, summarizeFlags } from './operational-summary'
 
 const imported: DataImportRow = {
   id: 'import-1', filename: 'serie.csv', original_filename: 'série.csv', file_hash: 'hash', source_type: 'SUPPLY_OUTLET', dmc_id: null, supply_group: 'XIXOVA', imported_by: 'user-1', imported_at: '2026-09-01T12:00:00Z', row_count: 4, accepted_count: 4, rejected_count: 0, status: 'COMPLETED', storage_path: 'path', file_size_bytes: 100, file_extension: 'csv', mime_type: 'text/csv',
@@ -10,6 +10,10 @@ const imported: DataImportRow = {
 
 describe('resumo operacional de importação', () => {
   it('extrai canal, unidade e período dos snapshots imutáveis', () => expect(readImportDescriptor(imported)).toMatchObject({ channelType: 'FLOW', rawUnit: 'l_s', normalizedUnit: 'l_s', cadenceMinutes: 15 }))
+  it('extrai todos os canais mapeados de um import DMC', () => {
+    const dmcImport = { ...imported, source_type: 'DMC' as const, dmc_id: 'dmc-1', supply_group: null, mapping_json: [{ channel_type: 'TIMESTAMP', unit: null }, { channel_type: 'PRESSURE_PC', unit: 'mca' }, { channel_type: 'FLOW', unit: 'm3_h' }, { channel_type: 'IGNORE', unit: null }] }
+    expect(readImportChannels(dmcImport)).toEqual([{ channelType: 'PRESSURE_PC', rawUnit: 'mca', normalizedUnit: 'mca' }, { channelType: 'FLOW', rawUnit: 'm3_h', normalizedUnit: 'l_s' }])
+  })
   it('calcula cobertura sem hardcode e limita em 100%', () => { expect(calculateCoverage('2026-01-01T03:00:00Z', '2026-01-01T04:00:00Z', 15, 4)).toBe(80); expect(calculateCoverage('2026-01-01T03:00:00Z', '2026-01-01T04:00:00Z', 15, 8)).toBe(100) })
   it('resume flags e soma ausências sem materializar timestamps', () => expect(summarizeFlags([
     { flag_type: 'MISSING_TIMESTAMP', severity: 'WARNING', details: { missingCount: 3 } },
