@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { DmcRow, PerformanceContractParameterRow, ReferenceCounts, TechnicalParameterRow } from '../types/database.types'
+import type { DmcCoverage, DmcRow, PerformanceContractParameterRow, ReferenceCounts, TechnicalParameterRow } from '../types/database.types'
 
 function client() {
   if (!supabase) throw new Error('Supabase não configurado')
@@ -20,6 +20,12 @@ async function count(table: string): Promise<number> {
   return total ?? 0
 }
 
+async function countWhere(table: string, column: string, value: string): Promise<number> {
+  const { count: total, error } = await client().from(table).select('*', { count: 'exact', head: true }).eq(column, value)
+  if (error) throw error
+  return total ?? 0
+}
+
 export const referenceDataService = {
   listDmcs: () => rows<DmcRow>('dmcs', '*', 'name'),
   listContractParameters: () => rows<PerformanceContractParameterRow>('performance_contract_parameters', '*', 'parameter_key'),
@@ -27,9 +33,13 @@ export const referenceDataService = {
   listPerformanceMonths: () => rows<unknown>('performance_months', 'id'),
   listProjectionScenarios: () => rows<unknown>('projection_scenarios', 'id'),
   async getCounts(): Promise<ReferenceCounts> {
-    const [imports, raw, exclusions, performanceMonths, projectionScenarios, equipmentPeriods] = await Promise.all([
-      count('data_imports'), count('raw_measurements'), count('data_exclusions'), count('performance_months'), count('projection_scenarios'), count('equipment_periods'),
+    const [imports, raw, exclusions, flags, rejectedRows, gaps, duplicates, performanceMonths, projectionScenarios, equipmentPeriods] = await Promise.all([
+      count('data_imports'), count('raw_measurements'), count('measurement_exclusions'), count('measurement_quality_flags'), count('import_rejected_rows'), countWhere('measurement_quality_flags', 'flag_type', 'MISSING_TIMESTAMP'), countWhere('measurement_quality_flags', 'flag_type', 'DUPLICATE'), count('performance_months'), count('projection_scenarios'), count('equipment_periods'),
     ])
-    return { imports, raw, exclusions, performanceMonths, projectionScenarios, equipmentPeriods }
+    return { imports, raw, exclusions, flags, rejectedRows, gaps, duplicates, performanceMonths, projectionScenarios, equipmentPeriods }
+  },
+  async getDmcCoverage(): Promise<DmcCoverage[]> {
+    const dmcs = await rows<DmcRow>('dmcs', '*', 'name')
+    return Promise.all(dmcs.map(async (dmc) => ({ id: dmc.id, name: dmc.name, rawCount: await countWhere('raw_measurements', 'dmc_id', dmc.id) })))
   },
 }

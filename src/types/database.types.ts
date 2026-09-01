@@ -91,7 +91,39 @@ export interface ReferenceCounts {
   imports: number
   raw: number
   exclusions: number
+  flags: number
+  rejectedRows: number
+  gaps: number
+  duplicates: number
   performanceMonths: number
   projectionScenarios: number
   equipmentPeriods: number
+}
+
+export interface DmcCoverage {
+  id: string
+  name: string
+  rawCount: number
+}
+
+export interface DataImportRow {
+  id: string
+  filename: string
+  original_filename: string
+  file_hash: string
+  source_type: 'DMC' | 'SUPPLY_OUTLET'
+  dmc_id: string | null
+  supply_group: SupplyGroup | null
+  imported_by: string | null
+  imported_at: string
+  row_count: number
+  accepted_count: number
+  rejected_count: number
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'PARTIAL'
+  mapping_json: unknown
+  metadata_json: unknown
+  storage_path: string | null
+  file_size_bytes: number | null
+  file_extension: string | null
+  mime_type: string | null
 }

@@ -1,0 +1,3 @@
+Data e hora	Vazão Inst. Direta 1 (l/s)
+01/01/2026 00:00	10.5
+01/01/2026 00:15	0

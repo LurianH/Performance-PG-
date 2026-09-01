@@ -10,6 +10,7 @@ const PressoesPage = lazy(() => import('./pages/PressoesPage'))
 const QualidadePage = lazy(() => import('./pages/QualidadePage'))
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
+const ImportacoesPage = lazy(() => import('./pages/ImportacoesPage'))
 
 export function App() {
   return (
@@ -22,6 +23,7 @@ export function App() {
           <Route path="projecoes" element={<ProjecoesPage />} />
           <Route path="pressoes" element={<PressoesPage />} />
           <Route path="qualidade" element={<QualidadePage />} />
+          <Route path="importacoes" element={<ProtectedRoute allowedRoles={['ADMIN', 'GESTOR']}><ImportacoesPage /></ProtectedRoute>} />
           <Route path="configuracoes" element={<ProtectedRoute allowedRoles={['ADMIN']}><ConfiguracoesPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

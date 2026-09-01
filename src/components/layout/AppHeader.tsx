@@ -1,4 +1,4 @@
-import { BarChart3, Database, Droplets, Gauge, Settings, ShieldCheck } from 'lucide-react'
+import { BarChart3, Database, Droplets, Gauge, Settings, ShieldCheck, UploadCloud } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { RoleGuard } from '../../features/auth/RoleGuard'
 import { useAuth } from '../../features/auth/useAuth'
@@ -32,6 +32,9 @@ export function AppHeader() {
             {label}
           </NavLink>
         ))}
+        <RoleGuard roles={['ADMIN', 'GESTOR']}>
+          <NavLink to="/importacoes" className={({ isActive }) => `tab${isActive ? ' active' : ''}`}><UploadCloud size={16} aria-hidden="true" />Importações</NavLink>
+        </RoleGuard>
         <RoleGuard roles={['ADMIN']}>
           <NavLink to="/configuracoes" className={({ isActive }) => `tab${isActive ? ' active' : ''}`}>
             <Settings size={16} aria-hidden="true" />
