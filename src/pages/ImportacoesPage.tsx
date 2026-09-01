@@ -6,7 +6,7 @@ import { DataState } from '../components/ui/DataState'
 import { PageHeading } from '../components/ui/PageHeading'
 import { useAuth } from '../features/auth/useAuth'
 import { formatImportDecimal, summarizeFlags, summarizePrevalidationChannels } from '../features/imports/operational-summary'
-import { decodeBytes, detectDelimiter, detectEncoding, parseDelimitedText, parseLocalTimestamp, parseLocaleNumber, prevalidate, sha256Hex, suggestMapping } from '../features/imports/parser'
+import { decodeBytes, detectDelimiter, detectEncoding, parseDelimitedText, parseLocalTimestamp, parseLocaleNumber, prevalidateDelimitedText, sha256Hex, suggestMapping } from '../features/imports/parser'
 import { getImportReadiness, mappingChannelOptions } from '../features/imports/readiness'
 import type { ColumnMapping, Delimiter, FileEncoding, HeaderMode, ImportChannel, ImportSource, ParsedTable, PrevalidationResult } from '../features/imports/types'
 import { useDmcs } from '../hooks/useReferenceData'
@@ -112,9 +112,15 @@ export function ImportacoesPage() {
   }, [bytes, channel, file, hash, mappings, source, table, unit])
 
   async function runPrevalidation() {
-    if (!table || !source || !readiness.ready) return
+    if (!table || !bytes || !source || !readiness.ready) return
     setError(null)
-    try { if (await findExistingImport(hash, source)) { setError('Este arquivo já foi importado.'); return }; setValidation(prevalidate(table, mappings)); setStep(2) }
+    try {
+      if (await findExistingImport(hash, source)) { setError('Este arquivo já foi importado.'); return }
+      const latest = prevalidateDelimitedText(decodeBytes(new Uint8Array(bytes), encoding), delimiter, encoding, headerMode, mappings)
+      setTable(latest.table)
+      setValidation(latest.result)
+      setStep(2)
+    }
     catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível validar a duplicidade.') }
   }
   async function confirmImport() {

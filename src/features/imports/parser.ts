@@ -81,6 +81,11 @@ export function parseDelimitedText(text: string, delimiter = detectDelimiter(tex
   return buildParsedTable(matrix, encoding, delimiter, headerMode)
 }
 
+export function prevalidateDelimitedText(text: string, delimiter: Delimiter, encoding: FileEncoding, headerMode: HeaderMode, mappings: ColumnMapping[]): { table: ParsedTable; result: PrevalidationResult } {
+  const table = parseDelimitedText(text, delimiter, encoding, headerMode)
+  return { table, result: prevalidate(table, mappings) }
+}
+
 export async function parseXlsxFile(file: Blob, headerMode: HeaderMode = 'PRESENT'): Promise<ParsedTable> {
   const { readSheet } = await import('read-excel-file/browser')
   const rows = await readSheet(file)
