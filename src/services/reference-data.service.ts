@@ -27,6 +27,19 @@ async function countWhere(table: string, column: string, value: string): Promise
   return total ?? 0
 }
 
+export async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let cursor = 0
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++
+      results[index] = await mapper(items[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
+}
+
 export const referenceDataService = {
   listDmcs: () => rows<DmcRow>('dmcs', '*', 'name'),
   listContractParameters: () => rows<PerformanceContractParameterRow>('performance_contract_parameters', '*', 'parameter_key'),
@@ -65,11 +78,12 @@ export const referenceDataService = {
   },
   async getDmcSeries(): Promise<DmcSeriesSummary[]> {
     const imports = (await rows<DataImportRow>('data_imports', '*', 'imported_at')).filter((item) => item.source_type === 'DMC' && item.status === 'COMPLETED' && item.dmc_id)
-    const summaries = await Promise.all(imports.flatMap((item) => {
+    const channels = imports.flatMap((item) => {
       const metadata = (item.metadata_json ?? {}) as Record<string, unknown>
       const mapping = Array.isArray(item.mapping_json) ? item.mapping_json as Array<Record<string, unknown>> : []
-      const channels = mapping.filter((entry) => entry.channel_type !== 'TIMESTAMP' && entry.channel_type !== 'IGNORE')
-      return channels.map(async (channel): Promise<DmcSeriesSummary> => {
+      return mapping.filter((entry) => entry.channel_type !== 'TIMESTAMP' && entry.channel_type !== 'IGNORE').map((channel) => ({ item, metadata, channel }))
+    })
+    const summaries = await mapWithConcurrency(channels, 4, async ({ item, metadata, channel }): Promise<DmcSeriesSummary> => {
         const channelType = String(channel.channel_type ?? '—')
         const unit = String(channel.unit ?? '—')
         const firstReading = String(metadata.first_reading ?? '')
@@ -84,7 +98,6 @@ export const referenceDataService = {
         const expected = cadenceMinutes && firstReading && lastReading ? Math.round((Date.parse(lastReading) - Date.parse(firstReading)) / 60000 / cadenceMinutes) + 1 : null
         return { importId: item.id, dmcId: item.dmc_id!, channelType, unit, normalizedUnit: normalizeMeasurement(null, channelType, unit).unit, firstReading, lastReading, rawCount, gapCount: gapResult.count ?? 0, cadenceMinutes, coveragePercent: expected ? Math.min(100, rawCount / expected * 100) : null }
       })
-    }))
     return summaries
   },
 }

@@ -19,7 +19,7 @@ export function PressoesPage() {
   const dmcs = useMemo(() => isMockMode ? (supply === 'TODAS' ? dmcsMock : dmcsMock.filter((dmc) => dmc.supply === supply)) : [], [isMockMode, supply])
   const officialDmcs = useMemo(() => supply === 'TODAS' ? official.data : official.data.filter((dmc) => dmc.supply_group === supply), [official.data, supply])
   const count = isMockMode ? dmcs.length : officialDmcs.length
-  const officialState = { loading: official.loading || dmcSeries.loading || diagnostics.loading, error: official.error ?? dmcSeries.error ?? diagnostics.error }
+  const officialState = { loading: official.loading || diagnostics.loading, error: official.error ?? diagnostics.error }
   const supplyAvailability = (['REDE', 'XIXOVA'] as const).map((group) => ({ group, pressure: supplySeries.data.some((series) => series.supplyGroup === group && series.channelType === 'PRESSURE_SUPPLY'), flow: supplySeries.data.some((series) => series.supplyGroup === group && series.channelType === 'FLOW') }))
 
   return <>
