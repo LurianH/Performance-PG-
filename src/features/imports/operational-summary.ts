@@ -1,10 +1,32 @@
 import { normalizeMeasurement } from '../hydraulics/domain-rules'
 import type { DataImportRow, ImportQualityBreakdown } from '../../types/database.types'
+import type { ColumnMapping, PrevalidationResult } from './types'
 
 export type ImportFlagRecord = {
   flag_type: string
   severity: string
   details: Record<string, unknown> | null
+}
+
+export function formatImportDecimal(value: number | null, maximumFractionDigits = 8): string {
+  return value === null ? '—' : value.toLocaleString('pt-BR', { maximumFractionDigits })
+}
+
+export function summarizePrevalidationChannels(result: PrevalidationResult, mappings: ColumnMapping[]) {
+  return mappings.filter((mapping) => !['IGNORE', 'TIMESTAMP'].includes(mapping.channelType)).map((mapping) => {
+    const measurements = result.measurements.filter((measurement) => measurement.columnIndex === mapping.index)
+    const numeric = measurements.map((measurement) => measurement.rawValue).filter((value): value is number => value !== null)
+    const flags = result.flags.filter((flag) => flag.columnIndex === mapping.index)
+    const quality = summarizeFlags(flags.map((flag) => ({ flag_type: flag.flagType, severity: flag.severity, details: flag.details })))
+    return {
+      mapping,
+      rawCount: measurements.length,
+      minimum: numeric.length ? numeric.reduce((minimum, value) => Math.min(minimum, value), numeric[0]) : null,
+      maximum: numeric.length ? numeric.reduce((maximum, value) => Math.max(maximum, value), numeric[0]) : null,
+      quality,
+      coverage: calculateCoverage(result.firstReading, result.lastReading, result.predominantCadenceMinutes, measurements.length),
+    }
+  })
 }
 
 export function readImportDescriptor(item: DataImportRow) {

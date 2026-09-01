@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DataImportRow } from '../../types/database.types'
-import { calculateCoverage, readImportChannels, readImportDescriptor, summarizeFlags } from './operational-summary'
+import { parseDelimitedText, prevalidate, suggestMapping } from './parser'
+import { calculateCoverage, formatImportDecimal, readImportChannels, readImportDescriptor, summarizeFlags, summarizePrevalidationChannels } from './operational-summary'
 
 const imported: DataImportRow = {
   id: 'import-1', filename: 'serie.csv', original_filename: 'série.csv', file_hash: 'hash', source_type: 'SUPPLY_OUTLET', dmc_id: null, supply_group: 'XIXOVA', imported_by: 'user-1', imported_at: '2026-09-01T12:00:00Z', row_count: 4, accepted_count: 4, rejected_count: 0, status: 'COMPLETED', storage_path: 'path', file_size_bytes: 100, file_extension: 'csv', mime_type: 'text/csv',
@@ -20,4 +21,14 @@ describe('resumo operacional de importação', () => {
     { flag_type: 'MISSING_TIMESTAMP', severity: 'WARNING', details: { missingCount: 2 } },
     { flag_type: 'ZERO_STREAK', severity: 'WARNING', details: { length: 4 } },
   ])).toEqual({ total: 3, breakdown: [{ type: 'MISSING_TIMESTAMP', severity: 'WARNING', count: 2 }, { type: 'ZERO_STREAK', severity: 'WARNING', count: 1 }], gaps: 2, missingTimestamps: 5 }))
+  it('mantém decimal com ponto no preview DMC sem multiplicar o valor por mil', () => {
+    const table = parseDelimitedText('Data e hora;Vazão Instantânea 1 (m³/h)\n01/01/2026 00:00;375.68408', ';', 'UTF-8', 'PRESENT')
+    const mappings = suggestMapping(table.headers)
+    const result = prevalidate(table, mappings)
+    const flow = summarizePrevalidationChannels(result, mappings).find((channel) => channel.mapping.channelType === 'FLOW')
+    expect(result.measurements[0].rawValue).toBe(375.68408)
+    expect(flow?.maximum).toBe(375.68408)
+    expect(flow?.maximum).not.toBe(375684.08)
+    expect(formatImportDecimal(flow?.maximum ?? null)).toBe('375,68408')
+  })
 })
