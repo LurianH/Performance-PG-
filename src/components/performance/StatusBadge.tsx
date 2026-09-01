@@ -1,9 +1,8 @@
-import type { PerformanceMonthMock } from '../../types/domain'
 import { Badge } from '../ui/Badge'
 
-const labels = { REALIZADO_ATUAL: 'Realizado (demo)', PARCIAL: 'Parcial (demo)', PROJETADO: 'Projetado (demo)' } as const
+const labels: Record<string, string> = { REALIZED: 'Realizado', PARTIAL: 'Parcial', PROJECTED: 'Projetado', REALIZADO_ATUAL: 'Realizado (demo)', PARCIAL: 'Parcial (demo)', PROJETADO: 'Projetado (demo)' }
 
-export function StatusBadge({ status }: Pick<PerformanceMonthMock, 'status'>) {
-  const tone = status === 'REALIZADO_ATUAL' ? 'success' : 'warning'
-  return <Badge tone={tone}>{labels[status]}</Badge>
+export function StatusBadge({ status }: { status: string }) {
+  const tone = status === 'REALIZED' || status === 'REALIZADO_ATUAL' ? 'success' : status === 'PARTIAL' || status === 'PARCIAL' ? 'warning' : 'info'
+  return <Badge tone={tone}>{labels[status] ?? status}</Badge>
 }

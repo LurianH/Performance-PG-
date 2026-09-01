@@ -186,6 +186,11 @@ select pg_temp.assert_true(
   'NOT_INSTALLED must be invalid while preserving raw zero and not normalizing an unknown unit'
 );
 
+-- O banco pode conter a apuração oficial da ETAPA 9. A remoção abaixo existe
+-- somente nesta transação de smoke e é integralmente desfeita pelo ROLLBACK.
+delete from public.performance_months
+where competence in ('2026-01-01', '2026-02-01');
+
 insert into public.performance_months (id, competence, vd, vcm, status, source, created_by)
 values
   (

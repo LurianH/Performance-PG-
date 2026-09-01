@@ -74,6 +74,51 @@ export interface PerformanceContractParameterRow {
   created_at: string
 }
 
+export type ContractMonthStatus = 'REALIZED' | 'PARTIAL' | 'PROJECTED'
+
+export interface PerformanceMonthDerivedRow {
+  id: string
+  competence: string
+  vd: number
+  vcm: number
+  vp: number
+  reduction: number
+  attainment_pct: number
+  status: ContractMonthStatus
+  source: string
+  notes: string | null
+  updated_at: string
+}
+
+export interface ProjectionScenarioRow {
+  id: string
+  name: string
+  description: string | null
+  assumptions: Record<string, unknown>
+  active: boolean
+}
+
+export interface ProjectionValueDerivedRow {
+  id: string
+  scenario_id: string
+  competence: string
+  vd: number
+  vcm: number
+  vp: number
+  reduction: number
+  attainment_pct: number
+  status: ContractMonthStatus
+}
+
+export interface ContractDashboardData {
+  months: PerformanceMonthDerivedRow[]
+  projections: ProjectionValueDerivedRow[]
+  scenario: ProjectionScenarioRow | null
+  baseline: number
+  targetReduction100: number
+  referenceReduction120: number
+}
+
 export interface TechnicalParameterRow {
   id: string
   key: string

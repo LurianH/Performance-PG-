@@ -5,6 +5,7 @@ Os testes foram implementados como scripts SQL transacionais e executados no Pos
 - `001_schema_smoke.sql` — regras estruturais e de domínio;
 - `002_rls_smoke.sql` — matriz de autorização e RLS.
 - `006_hydraulic_diagnostics.sql` — persistência analítica, RLS e executor interno da ETAPA 8.
+- `007_stage9_performance.sql` — dados oficiais, fórmulas derivadas e projeções da ETAPA 9.
 
 Cada script inicia com `BEGIN` e termina com `ROLLBACK`. Os e-mails usam o domínio reservado `example.invalid` e os UUIDs são fixos e exclusivos para facilitar a verificação posterior.
 
@@ -23,5 +24,6 @@ Cada script inicia com `BEGIN` e termina com `ROLLBACK`. Os e-mails usam o domí
 11. revogação de expurgo restaura elegibilidade quando não existe outro impedimento.
 12. parâmetros contratuais sem vigência produzem redução/atingimento `NULL`.
 13. migrations aplicam do zero sem seeds ou dados oficiais.
+14. apuração e projeções preservam `VP = VD - VCM`, redução e atingimento como valores derivados.
 
 Resultado em 2026-08-31: ambos aprovados. A consulta posterior confirmou zero fixtures exatas persistidas.

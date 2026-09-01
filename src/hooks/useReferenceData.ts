@@ -2,7 +2,8 @@ import { useCallback, useMemo } from 'react'
 import { useAuth } from '../features/auth/useAuth'
 import { referenceDataService } from '../services/reference-data.service'
 import { hydraulicDiagnosticsService } from '../services/hydraulic-diagnostics.service'
-import type { DataImportRow, DmcCoverage, DmcHydraulicDailyRow, DmcHydraulicMonthlyRow, DmcRow, DmcSeriesSummary, PerformanceContractParameterRow, ReferenceCounts, SupplySeriesSummary, TechnicalParameterRow } from '../types/database.types'
+import { getContractDashboard } from '../services/performance.service'
+import type { ContractDashboardData, DataImportRow, DmcCoverage, DmcHydraulicDailyRow, DmcHydraulicMonthlyRow, DmcRow, DmcSeriesSummary, PerformanceContractParameterRow, ReferenceCounts, SupplySeriesSummary, TechnicalParameterRow } from '../types/database.types'
 import { useReferenceQuery } from './useReferenceQuery'
 
 const EMPTY_ROWS: never[] = []
@@ -68,6 +69,13 @@ export function useHydraulicDmcDetail(dmcId: string | undefined) {
   const enabled = useRealMode() && Boolean(dmcId)
   const loader = useCallback(() => dmcId ? hydraulicDiagnosticsService.getDmcDetail(dmcId) : Promise.resolve({ daily: [], monthly: [] }), [dmcId])
   return useReferenceQuery<{ daily: DmcHydraulicDailyRow[]; monthly: DmcHydraulicMonthlyRow[] }>(loader, { daily: [], monthly: [] }, enabled)
+}
+
+const EMPTY_CONTRACT: ContractDashboardData = { months: [], projections: [], scenario: null, baseline: 0, targetReduction100: 0, referenceReduction120: 0 }
+export function useContractDashboard() {
+  const enabled = useRealMode()
+  const loader = useCallback(() => getContractDashboard(), [])
+  return useReferenceQuery<ContractDashboardData>(loader, EMPTY_CONTRACT, enabled)
 }
 
 export function useOfficialEmptyStates() {

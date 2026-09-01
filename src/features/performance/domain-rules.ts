@@ -15,3 +15,15 @@ export function calculateAttainment(reduction: number | null, targetReduction: n
 export function scenarioLifecycle(active: boolean) {
   return { selectable: active, retainedInHistory: true } as const
 }
+
+export function isConsolidatedPerformance(status: string): boolean { return status === 'REALIZED' }
+
+export function assertDistinctContractStages(rows: Array<{ competence: string; status: string }>): boolean {
+  const seen = new Set<string>()
+  for (const row of rows) {
+    const key = `${row.competence}|${row.status}`
+    if (seen.has(key)) return false
+    seen.add(key)
+  }
+  return true
+}
