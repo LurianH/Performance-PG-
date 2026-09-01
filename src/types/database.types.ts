@@ -106,6 +106,19 @@ export interface DmcCoverage {
   rawCount: number
 }
 
+export interface SupplySeriesSummary {
+  importId: string
+  supplyGroup: SupplyGroup
+  channelType: string
+  unit: string
+  firstReading: string
+  lastReading: string
+  rawCount: number
+  gapCount: number
+  cadenceMinutes: number | null
+  coveragePercent: number | null
+}
+
 export interface DataImportRow {
   id: string
   filename: string
