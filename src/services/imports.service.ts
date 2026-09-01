@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { DataImportRow } from '../types/database.types'
-import { IMPORT_ALGORITHM_VERSION } from '../features/imports/parser'
+import { IMPORT_ALGORITHM_VERSION, serializeMappings } from '../features/imports/parser'
 import type { ColumnMapping, ImportSource, ObjectiveFlag, PrevalidationResult } from '../features/imports/types'
 
 export const DEFAULT_IMPORT_BATCH_SIZE = 500
@@ -37,6 +37,7 @@ export interface ExecuteImportInput {
   hash: string
   source: ImportSource
   mappings: ColumnMapping[]
+  hasHeader: boolean
   prevalidation: PrevalidationResult
   encoding: string
   delimiter: string | null
@@ -53,8 +54,8 @@ export async function executeImport(input: ExecuteImportInput): Promise<DataImpo
   const importId = crypto.randomUUID()
   const safeName = input.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_')
   const storagePath = `${input.userId}/${importId}/${safeName}`
-  const mappingJson = input.mappings.map((mapping) => ({ header_original: mapping.headerOriginal, header_normalized: mapping.headerNormalized, channel_type: mapping.channelType, unit: mapping.unit, column_index: mapping.index }))
-  const metadataJson = { encoding: input.encoding, delimiter: input.delimiter, timezone: 'America/Sao_Paulo', sha256_over_original_bytes: true, algorithm_version: IMPORT_ALGORITHM_VERSION, batch_size: input.batchSize ?? DEFAULT_IMPORT_BATCH_SIZE, first_reading: input.prevalidation.firstReading, last_reading: input.prevalidation.lastReading, predominant_cadence_minutes: input.prevalidation.predominantCadenceMinutes }
+  const mappingJson = serializeMappings(input.mappings, input.hasHeader)
+  const metadataJson = { encoding: input.encoding, delimiter: input.delimiter, has_header: input.hasHeader, physical_row_count: input.prevalidation.physicalRowCount, timezone: 'America/Sao_Paulo', sha256_over_original_bytes: true, algorithm_version: IMPORT_ALGORITHM_VERSION, batch_size: input.batchSize ?? DEFAULT_IMPORT_BATCH_SIZE, first_reading: input.prevalidation.firstReading, last_reading: input.prevalidation.lastReading, predominant_cadence_minutes: input.prevalidation.predominantCadenceMinutes }
   const insert = {
     id: importId, filename: safeName, original_filename: input.file.name, file_hash: input.hash,
     source_type: input.source.type, dmc_id: input.source.type === 'DMC' ? input.source.dmc.id : null,

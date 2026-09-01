@@ -85,6 +85,8 @@ tbody tr:hover { background: #f8faf9; }
 .wizard-panel input[type="file"], .wizard-panel select { max-width: 100%; padding: .65rem; border: 1px solid var(--border); border-radius: .5rem; background: white; }
 .origin-grid, .parser-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; align-items: end; }
 .origin-grid label, .parser-controls label { display: grid; gap: .35rem; }
+.header-choice { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface-soft); }
+.header-choice label { display: grid; gap: .35rem; }
 .button-row { display: flex; flex-wrap: wrap; gap: .65rem; justify-content: flex-end; }
 .button-row button.active { background: var(--green); color: white; }
 .preview-table { max-height: 25rem; }

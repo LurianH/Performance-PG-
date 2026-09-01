@@ -1,4 +1,4 @@
-import type { ColumnMapping, Delimiter, FileEncoding, ObjectiveFlag, ParsedTable, PrevalidationResult, PreparedMeasurement, RejectedRow } from './types'
+import type { ColumnMapping, Delimiter, FileEncoding, HeaderMode, ObjectiveFlag, ParsedTable, PrevalidationResult, PreparedMeasurement, RejectedRow } from './types'
 
 export const IMPORT_TIMEZONE = 'America/Sao_Paulo'
 export const IMPORT_ALGORITHM_VERSION = 'raw-import-v1'
@@ -46,16 +46,45 @@ function splitDelimitedLine(line: string, delimiter: Delimiter): string[] {
   return cells
 }
 
-export function parseDelimitedText(text: string, delimiter = detectDelimiter(text), encoding: FileEncoding = 'UTF-8'): ParsedTable {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim().length > 0)
-  const matrix = lines.map((line) => splitDelimitedLine(line, delimiter))
-  return { headers: matrix[0] ?? [], rows: matrix.slice(1), encoding, delimiter }
+function cellKind(value: unknown): 'TIMESTAMP' | 'NUMBER' | 'EMPTY' | 'TEXT' {
+  if (value === null || value === undefined || String(value).trim() === '') return 'EMPTY'
+  if (parseLocalTimestamp(value)) return 'TIMESTAMP'
+  if (parseLocaleNumber(value) !== undefined) return 'NUMBER'
+  return 'TEXT'
 }
 
-export async function parseXlsxFile(file: Blob): Promise<ParsedTable> {
+export function detectHeaderMode(matrix: unknown[][]): { suggestedMode: Exclude<HeaderMode, 'AUTO'> | null; confidence: 'HIGH' | 'LOW' } {
+  if (matrix.length < 2 || matrix[0].length === 0) return { suggestedMode: null, confidence: 'LOW' }
+  const first = matrix[0].map(cellKind)
+  const following = matrix.slice(1, 6).filter((row) => row.length === first.length).map((row) => row.map(cellKind))
+  if (following.length === 0) return { suggestedMode: null, confidence: 'LOW' }
+  const compatible = following.filter((kinds) => kinds.every((kind, index) => kind === first[index])).length
+  const firstLooksLikeData = first.some((kind) => kind === 'TIMESTAMP') && first.some((kind) => kind === 'NUMBER')
+  if (firstLooksLikeData && compatible >= Math.min(2, following.length)) return { suggestedMode: 'ABSENT', confidence: 'HIGH' }
+  const followingLooksLikeData = following.filter((kinds) => kinds.some((kind) => kind === 'TIMESTAMP') && kinds.some((kind) => kind === 'NUMBER')).length
+  if (first.some((kind) => kind === 'TEXT') && followingLooksLikeData >= Math.min(2, following.length)) return { suggestedMode: 'PRESENT', confidence: 'HIGH' }
+  return { suggestedMode: null, confidence: 'LOW' }
+}
+
+function buildParsedTable(matrix: unknown[][], encoding: FileEncoding | 'XLSX', delimiter: Delimiter | null, headerMode: HeaderMode): ParsedTable {
+  const detection = detectHeaderMode(matrix)
+  const hasHeader = headerMode === 'PRESENT' ? true : headerMode === 'ABSENT' ? false : detection.suggestedMode === 'PRESENT' ? true : detection.suggestedMode === 'ABSENT' ? false : null
+  const width = Math.max(0, ...matrix.map((row) => row.length))
+  const headers = hasHeader ? (matrix[0] ?? []).map(String) : Array.from({ length: width }, (_, index) => `Coluna ${index + 1}`)
+  const rows = hasHeader === true ? matrix.slice(1) : matrix
+  return { headers, rows, encoding, delimiter, hasHeader, physicalRowCount: matrix.length, suggestedHeaderMode: detection.suggestedMode, headerConfidence: detection.confidence }
+}
+
+export function parseDelimitedText(text: string, delimiter = detectDelimiter(text), encoding: FileEncoding = 'UTF-8', headerMode: HeaderMode = 'PRESENT'): ParsedTable {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim().length > 0)
+  const matrix = lines.map((line) => splitDelimitedLine(line, delimiter))
+  return buildParsedTable(matrix, encoding, delimiter, headerMode)
+}
+
+export async function parseXlsxFile(file: Blob, headerMode: HeaderMode = 'PRESENT'): Promise<ParsedTable> {
   const { readSheet } = await import('read-excel-file/browser')
   const rows = await readSheet(file)
-  return { headers: (rows[0] ?? []).map(String), rows: rows.slice(1), encoding: 'XLSX', delimiter: null }
+  return buildParsedTable(rows, 'XLSX', null, headerMode)
 }
 
 export function parseLocaleNumber(input: unknown): number | null | undefined {
@@ -86,7 +115,7 @@ export function normalizeHeader(header: string): string {
   return header.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/³/g, '3').replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-export function suggestMapping(headers: string[], pcChannel?: string | null): ColumnMapping[] {
+export function suggestMapping(headers: string[], pcChannel?: string | null, genericPressureChannel: 'PRESSURE_PC' | 'PRESSURE_SUPPLY' = 'PRESSURE_PC', hasHeader = true): ColumnMapping[] {
   const pc = pcChannel ? normalizeHeader(pcChannel) : null
   return headers.map((headerOriginal, index) => {
     const headerNormalized = normalizeHeader(headerOriginal)
@@ -97,10 +126,14 @@ export function suggestMapping(headers: string[], pcChannel?: string | null): Co
     else if (pc && headerNormalized === pc) { channelType = 'PRESSURE_PC'; unit = 'mca'; confidence = 'HIGH' }
     else if (/pressao.*montante/.test(headerNormalized)) { channelType = 'PRESSURE_UPSTREAM'; unit = 'mca'; confidence = 'MEDIUM' }
     else if (/pressao.*jusante/.test(headerNormalized)) { channelType = 'PRESSURE_DOWNSTREAM'; unit = 'mca'; confidence = 'MEDIUM' }
-    else if (/pressao/.test(headerNormalized)) { channelType = 'PRESSURE_PC'; unit = 'mca'; confidence = 'MEDIUM' }
+    else if (/pressao/.test(headerNormalized)) { channelType = genericPressureChannel; unit = 'mca'; confidence = 'MEDIUM' }
     else if (/vazao/.test(headerNormalized)) { channelType = 'FLOW'; unit = /l\s?s|l s/.test(headerNormalized) ? 'l_s' : 'm3_h'; confidence = 'MEDIUM' }
-    return { index, headerOriginal, headerNormalized, channelType, unit, confidence }
+    return { index, headerOriginal: hasHeader ? headerOriginal : null, displayName: headerOriginal, headerNormalized, channelType, unit, confidence }
   })
+}
+
+export function serializeMappings(mappings: ColumnMapping[], hasHeader: boolean): Record<string, unknown>[] {
+  return mappings.map((mapping) => ({ has_header: hasHeader, column_index: mapping.index, header_original: mapping.headerOriginal, display_name: mapping.displayName, channel_type: mapping.channelType, unit: mapping.unit }))
 }
 
 function payload(headers: string[], row: unknown[]): Record<string, unknown> {
@@ -119,7 +152,7 @@ export function prevalidate(table: ParsedTable, mappings: ColumnMapping[], zeroS
   const zeroRuns = new Map<number, PreparedMeasurement[]>()
 
   table.rows.forEach((row, rowIndex) => {
-    const rowNumber = rowIndex + 2
+    const rowNumber = rowIndex + (table.hasHeader ? 2 : 1)
     const rawPayload = payload(table.headers, row)
     const measuredAt = timestamp ? parseLocalTimestamp(row[timestamp.index]) : null
     if (!measuredAt) { rejectedRows.push({ rowNumber, rawPayload, reasonCode: 'INVALID_TIMESTAMP', details: { original: timestamp ? row[timestamp.index] ?? null : null } }); return }
@@ -129,7 +162,7 @@ export function prevalidate(table: ParsedTable, mappings: ColumnMapping[], zeroS
       if (parsed === undefined) numericParseErrorCount += 1
       else if (parsed === null) nullValueCount += 1
       else validNumericCount += 1
-      const measurement: PreparedMeasurement = { rowNumber, columnIndex: mapping.index, channelType: mapping.channelType as PreparedMeasurement['channelType'], channelName: mapping.headerOriginal, measuredAt, rawValue: parsed ?? null, unit: mapping.unit ?? 'raw', rawPayload }
+      const measurement: PreparedMeasurement = { rowNumber, columnIndex: mapping.index, channelType: mapping.channelType as PreparedMeasurement['channelType'], channelName: mapping.displayName, measuredAt, rawValue: parsed ?? null, unit: mapping.unit ?? 'raw', rawPayload }
       measurements.push(measurement)
       if (parsed === null || parsed === undefined) flags.push({ rowNumber, columnIndex: mapping.index, flagType: 'NULL_VALUE', severity: 'WARNING', details: { parseError: parsed === undefined, original: row[mapping.index] ?? null } })
       const duplicateKey = `${mapping.index}|${measuredAt}`
@@ -146,5 +179,5 @@ export function prevalidate(table: ParsedTable, mappings: ColumnMapping[], zeroS
   const cadence = [...frequencies.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
   const gaps = cadence ? deltas.map((delta, index) => ({ delta, index })).filter(({ delta }) => delta > cadence) : []
   gaps.forEach(({ delta, index }) => { const firstAfter = measurements.find((item) => Date.parse(item.measuredAt) === sorted[index + 1]); if (firstAfter) flags.push({ rowNumber: firstAfter.rowNumber, columnIndex: firstAfter.columnIndex, flagType: 'MISSING_TIMESTAMP', severity: 'WARNING', details: { gapStart: new Date(sorted[index]).toISOString(), gapEnd: new Date(sorted[index + 1]).toISOString(), expectedIntervalMinutes: cadence, missingCount: Math.max(0, Math.round(delta / cadence!) - 1) } }) })
-  return { measurements, rejectedRows, flags, sourceRowCount: table.rows.length, validTimestampCount: table.rows.length - rejectedRows.length, invalidTimestampCount: rejectedRows.length, mappedChannelCount: channels.length, validNumericCount, nullValueCount, numericParseErrorCount, duplicateCount: flags.filter((flag) => flag.flagType === 'DUPLICATE').length, predominantCadenceMinutes: cadence, gapCount: gaps.length, largestGapMinutes: gaps.length ? Math.max(...gaps.map((gap) => gap.delta)) : null, firstReading: sorted.length ? new Date(sorted[0]).toISOString() : null, lastReading: sorted.length ? new Date(sorted[sorted.length - 1]).toISOString() : null }
+  return { measurements, rejectedRows, flags, sourceRowCount: table.rows.length, physicalRowCount: table.physicalRowCount, validTimestampCount: table.rows.length - rejectedRows.length, invalidTimestampCount: rejectedRows.length, mappedChannelCount: channels.length, validNumericCount, nullValueCount, numericParseErrorCount, duplicateCount: flags.filter((flag) => flag.flagType === 'DUPLICATE').length, predominantCadenceMinutes: cadence, gapCount: gaps.length, largestGapMinutes: gaps.length ? Math.max(...gaps.map((gap) => gap.delta)) : null, firstReading: sorted.length ? new Date(sorted[0]).toISOString() : null, lastReading: sorted.length ? new Date(sorted[sorted.length - 1]).toISOString() : null }
 }

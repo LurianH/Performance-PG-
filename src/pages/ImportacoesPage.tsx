@@ -6,7 +6,8 @@ import { DataState } from '../components/ui/DataState'
 import { PageHeading } from '../components/ui/PageHeading'
 import { useAuth } from '../features/auth/useAuth'
 import { decodeBytes, detectDelimiter, detectEncoding, parseDelimitedText, parseLocalTimestamp, parseLocaleNumber, parseXlsxFile, prevalidate, sha256Hex, suggestMapping } from '../features/imports/parser'
-import type { ColumnMapping, Delimiter, FileEncoding, ImportChannel, ImportSource, ParsedTable, PrevalidationResult } from '../features/imports/types'
+import { getImportReadiness } from '../features/imports/readiness'
+import type { ColumnMapping, Delimiter, FileEncoding, HeaderMode, ImportChannel, ImportSource, ParsedTable, PrevalidationResult } from '../features/imports/types'
 import { useDmcs } from '../hooks/useReferenceData'
 import { executeImport, listImports, requestReprocessing } from '../services/imports.service'
 import type { DataImportRow, SupplyGroup } from '../types/database.types'
@@ -23,6 +24,7 @@ export function ImportacoesPage() {
   const [hash, setHash] = useState('')
   const [encoding, setEncoding] = useState<FileEncoding>('UTF-8')
   const [delimiter, setDelimiter] = useState<Delimiter>(';')
+  const [headerMode, setHeaderMode] = useState<HeaderMode>('AUTO')
   const [table, setTable] = useState<ParsedTable | null>(null)
   const [source, setSource] = useState<ImportSource | null>(null)
   const [mappings, setMappings] = useState<ColumnMapping[]>([])
@@ -41,13 +43,24 @@ export function ImportacoesPage() {
 
   useEffect(() => { void refreshHistory() }, [refreshHistory])
 
-  const parseTextAgain = useCallback((nextEncoding: FileEncoding, nextDelimiter: Delimiter) => {
+  const applyTable = useCallback((parsed: ParsedTable, mode: HeaderMode) => {
+    setTable(parsed)
+    setHeaderMode(mode)
+    setMappings(suggestMapping(parsed.headers, source?.type === 'DMC' ? source.dmc.pc_channel : null, source?.type === 'SUPPLY_OUTLET' ? 'PRESSURE_SUPPLY' : 'PRESSURE_PC', parsed.hasHeader === true))
+    setValidation(null)
+  }, [source])
+
+  const parseTextAgain = useCallback((nextEncoding: FileEncoding, nextDelimiter: Delimiter, nextHeaderMode: HeaderMode = headerMode) => {
     if (!bytes || file?.name.toLowerCase().endsWith('.xlsx')) return
     const text = decodeBytes(new Uint8Array(bytes), nextEncoding)
-    const parsed = parseDelimitedText(text, nextDelimiter, nextEncoding)
-    setTable(parsed)
-    setMappings(suggestMapping(parsed.headers, source?.type === 'DMC' ? source.dmc.pc_channel : null))
-  }, [bytes, file, source])
+    applyTable(parseDelimitedText(text, nextDelimiter, nextEncoding, nextHeaderMode), nextHeaderMode)
+  }, [applyTable, bytes, file, headerMode])
+
+  async function changeHeaderMode(nextHeaderMode: HeaderMode) {
+    if (!file || !bytes) return
+    if (file.name.toLowerCase().endsWith('.xlsx')) applyTable(await parseXlsxFile(file, nextHeaderMode), nextHeaderMode)
+    else parseTextAgain(encoding, delimiter, nextHeaderMode)
+  }
 
   async function selectFile(selected?: File) {
     if (!selected) return
@@ -57,26 +70,42 @@ export function ImportacoesPage() {
     const extension = selected.name.split('.').pop()?.toLowerCase()
     if (!['csv', 'txt', 'xlsx'].includes(extension ?? '')) { setError('Formato não suportado. Use TXT, CSV ou XLSX.'); return }
     if (extension === 'xlsx') {
-      const parsed = await parseXlsxFile(selected); setTable(parsed); setMappings(suggestMapping(parsed.headers)); setStep(1); return
+      const detected = await parseXlsxFile(selected, 'AUTO')
+      const mode = detected.suggestedHeaderMode ?? 'AUTO'
+      applyTable(mode === 'AUTO' ? detected : await parseXlsxFile(selected, mode), mode); setStep(1); return
     }
     const detectedEncoding = detectEncoding(new Uint8Array(originalBytes))
     const text = decodeBytes(new Uint8Array(originalBytes), detectedEncoding)
     const detectedDelimiter = detectDelimiter(text)
-    const parsed = parseDelimitedText(text, detectedDelimiter, detectedEncoding)
-    setEncoding(detectedEncoding); setDelimiter(detectedDelimiter); setTable(parsed); setMappings(suggestMapping(parsed.headers)); setStep(1)
+    const detected = parseDelimitedText(text, detectedDelimiter, detectedEncoding, 'AUTO')
+    const mode = detected.suggestedHeaderMode ?? 'AUTO'
+    const parsed = mode === 'AUTO' ? detected : parseDelimitedText(text, detectedDelimiter, detectedEncoding, mode)
+    setEncoding(detectedEncoding); setDelimiter(detectedDelimiter); applyTable(parsed, mode); setStep(1)
   }
 
   function chooseDmc(id: string) {
     const dmc = dmcs.data.find((item) => item.id === id)
     if (!dmc || !table) return
-    setSource({ type: 'DMC', dmc }); setMappings(suggestMapping(table.headers, dmc.pc_channel))
+    setSource({ type: 'DMC', dmc }); setMappings(suggestMapping(table.headers, dmc.pc_channel, 'PRESSURE_PC', table.hasHeader === true))
   }
 
-  function chooseSupply(supplyGroup: SupplyGroup) { setSource({ type: 'SUPPLY_OUTLET', supplyGroup }) }
-  function changeMapping(index: number, field: 'channelType' | 'unit', value: string) { setMappings((current) => current.map((mapping) => mapping.index === index ? { ...mapping, [field]: value } as ColumnMapping : mapping)) }
+  function chooseSupply(supplyGroup: SupplyGroup) {
+    setSource({ type: 'SUPPLY_OUTLET', supplyGroup })
+    if (table) setMappings(suggestMapping(table.headers, null, 'PRESSURE_SUPPLY', table.hasHeader === true))
+  }
+  function changeMapping(index: number, field: 'channelType' | 'unit', value: string) {
+    setMappings((current) => current.map((mapping) => {
+      if (mapping.index !== index) return mapping
+      if (field === 'unit') return { ...mapping, unit: value }
+      const channelType = value as ImportChannel
+      const unit = ['IGNORE', 'TIMESTAMP'].includes(channelType) ? null : channelType.startsWith('PRESSURE_') ? (mapping.unit ?? 'mca') : mapping.unit
+      return { ...mapping, channelType, unit }
+    }))
+  }
 
   const preview = useMemo(() => table?.rows.slice(0, 20) ?? [], [table])
-  const canPrevalidate = mappings.filter((item) => item.channelType === 'TIMESTAMP').length === 1 && mappings.some((item) => !['IGNORE', 'TIMESTAMP'].includes(item.channelType)) && mappings.filter((item) => !['IGNORE', 'TIMESTAMP'].includes(item.channelType)).every((item) => item.unit)
+  const readiness = useMemo(() => getImportReadiness({ fileSelected: Boolean(file), bytesReady: Boolean(bytes), hashReady: Boolean(hash), table, source, mappings }), [bytes, file, hash, mappings, source, table])
+  const canPrevalidate = readiness.ready
 
   function runPrevalidation() {
     if (!table || !canPrevalidate) return
@@ -87,12 +116,12 @@ export function ImportacoesPage() {
     if (!file || !bytes || !source || !validation || !user) return
     setStep(5); setError(null); setProgress({ processed: 0, total: validation.measurements.length })
     try {
-      const imported = await executeImport({ file, bytes, hash, source, mappings, prevalidation: validation, encoding: table?.encoding ?? encoding, delimiter: table?.delimiter ?? null, userId: user.id, onProgress: (processed, total) => setProgress({ processed, total }) })
+      const imported = await executeImport({ file, bytes, hash, source, mappings, hasHeader: table?.hasHeader === true, prevalidation: validation, encoding: table?.encoding ?? encoding, delimiter: table?.delimiter ?? null, userId: user.id, onProgress: (processed, total) => setProgress({ processed, total }) })
       setResult(imported); setStep(6); await refreshHistory()
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Falha durante a importação'); setStep(6); await refreshHistory() }
   }
 
-  function resetWizard() { setStep(0); setFile(null); setBytes(null); setHash(''); setTable(null); setSource(null); setMappings([]); setValidation(null); setResult(null); setError(null) }
+  function resetWizard() { setStep(0); setFile(null); setBytes(null); setHash(''); setHeaderMode('AUTO'); setTable(null); setSource(null); setMappings([]); setValidation(null); setResult(null); setError(null) }
 
   return (
     <>
@@ -101,8 +130,8 @@ export function ImportacoesPage() {
       {error && <div className="import-error" role="alert">{error}</div>}
       <Card className="import-wizard">
         {step === 0 && <div className="wizard-panel"><FileSpreadsheet size={36} /><h3>1. Selecione o arquivo</h3><p className="desc">Os bytes originais serão usados no hash e preservados sem conversão.</p><input aria-label="Arquivo hidráulico" type="file" accept=".txt,.csv,.xlsx" disabled={isMockMode} onChange={(event) => void selectFile(event.target.files?.[0])} />{isMockMode && <p className="note">Importação disponível somente com Supabase configurado e sessão ADMIN/GESTOR.</p>}</div>}
-        {step === 1 && <div className="wizard-panel"><h3>2. Origem da série</h3><div className="origin-grid"><label><input type="radio" checked={source?.type === 'DMC'} onChange={() => source?.type !== 'DMC' && setSource(null)} /> DMC</label><select value={source?.type === 'DMC' ? source.dmc.id : ''} onChange={(event) => chooseDmc(event.target.value)}><option value="">Selecione um dos 14 DMCs</option>{dmcs.data.map((dmc) => <option key={dmc.id} value={dmc.id}>{dmc.name} · {dmc.supply_group}</option>)}</select><label><input type="radio" checked={source?.type === 'SUPPLY_OUTLET'} onChange={() => setSource({ type: 'SUPPLY_OUTLET', supplyGroup: 'REDE' })} /> Saída do reservatório</label><div className="button-row"><button type="button" className={source?.type === 'SUPPLY_OUTLET' && source.supplyGroup === 'REDE' ? 'active' : ''} onClick={() => chooseSupply('REDE')}>REDE</button><button type="button" className={source?.type === 'SUPPLY_OUTLET' && source.supplyGroup === 'XIXOVA' ? 'active' : ''} onClick={() => chooseSupply('XIXOVA')}>XIXOVA</button></div></div><div className="button-row"><button type="button" className="secondary-button" onClick={resetWizard}>Cancelar</button><button type="button" disabled={!source} onClick={() => setStep(2)}>Continuar para mapeamento</button></div></div>}
-        {step === 2 && table && <div className="wizard-panel"><h3>3. Mapeamento e prévia</h3>{table.encoding !== 'XLSX' && <div className="parser-controls"><label>Encoding<select value={encoding} onChange={(event) => { const value = event.target.value as FileEncoding; setEncoding(value); parseTextAgain(value, delimiter) }}><option>UTF-8</option><option>WINDOWS-1252</option></select></label><label>Delimitador<select value={delimiter} onChange={(event) => { const value = event.target.value as Delimiter; setDelimiter(value); parseTextAgain(encoding, value) }}><option value=";">Ponto e vírgula (;)</option><option value=",">Vírgula (,)</option><option value={'\t'}>Tabulação</option></select></label></div>}<div className="table-wrap"><table><thead><tr><th>Posição / cabeçalho original</th><th>Mapear como</th><th>Unidade</th><th>Sugestão</th></tr></thead><tbody>{mappings.map((mapping) => <tr key={mapping.index}><td>{mapping.index} · <strong>{mapping.headerOriginal}</strong><small className="cell-note">{mapping.headerNormalized}</small></td><td><select value={mapping.channelType} onChange={(event) => changeMapping(mapping.index, 'channelType', event.target.value)}>{channels.map((channel) => <option key={channel}>{channel}</option>)}</select></td><td>{!['IGNORE', 'TIMESTAMP'].includes(mapping.channelType) ? <select value={mapping.unit ?? ''} onChange={(event) => changeMapping(mapping.index, 'unit', event.target.value)}><option value="">Confirmar unidade</option><option value="mca">mca</option><option value="m3_h">m3_h</option><option value="l_s">l_s</option><option value="raw">raw</option></select> : '—'}</td><td><Badge tone={mapping.confidence === 'HIGH' ? 'success' : mapping.confidence === 'MEDIUM' ? 'warning' : 'neutral'}>{mapping.confidence}</Badge></td></tr>)}</tbody></table></div><h4>Primeiras {preview.length} linhas interpretadas</h4><div className="table-wrap preview-table"><table><thead><tr><th>Linha</th>{table.headers.map((header, index) => <th key={`${index}-${header}`}>{header}</th>)}</tr></thead><tbody>{preview.map((row, rowIndex) => <tr key={rowIndex}><td>{rowIndex + 2}</td>{row.map((value, columnIndex) => { const mapping = mappings[columnIndex]; return <td key={columnIndex}><span>{value instanceof Date ? value.toISOString() : String(value ?? '')}</span>{mapping?.channelType === 'TIMESTAMP' && <small className="cell-note">{parseLocalTimestamp(value) ?? 'TIMESTAMP INVÁLIDO'}</small>}{mapping && !['IGNORE', 'TIMESTAMP'].includes(mapping.channelType) && <small className="cell-note">numérico: {String(parseLocaleNumber(value) ?? 'NULL/ERRO')}</small>}</td>})}</tr>)}</tbody></table></div><div className="button-row"><button type="button" className="secondary-button" onClick={() => setStep(1)}>Voltar</button><button type="button" disabled={!canPrevalidate} onClick={runPrevalidation}>Pré-validar arquivo</button></div></div>}
+        {step === 1 && <div className="wizard-panel"><h3>2. Origem da série</h3><div className="origin-grid"><label><input type="radio" checked={source?.type === 'DMC'} onChange={() => source?.type !== 'DMC' && setSource(null)} /> DMC</label><select value={source?.type === 'DMC' ? source.dmc.id : ''} onChange={(event) => chooseDmc(event.target.value)}><option value="">Selecione um dos 14 DMCs</option>{dmcs.data.map((dmc) => <option key={dmc.id} value={dmc.id}>{dmc.name} · {dmc.supply_group}</option>)}</select><label><input type="radio" checked={source?.type === 'SUPPLY_OUTLET'} onChange={() => chooseSupply('REDE')} /> Saída do reservatório</label><div className="button-row"><button type="button" className={source?.type === 'SUPPLY_OUTLET' && source.supplyGroup === 'REDE' ? 'active' : ''} onClick={() => chooseSupply('REDE')}>REDE</button><button type="button" className={source?.type === 'SUPPLY_OUTLET' && source.supplyGroup === 'XIXOVA' ? 'active' : ''} onClick={() => chooseSupply('XIXOVA')}>XIXOVA</button></div></div><div className="button-row"><button type="button" className="secondary-button" onClick={resetWizard}>Cancelar</button><button type="button" disabled={!source} onClick={() => setStep(2)}>Continuar para mapeamento</button></div></div>}
+        {step === 2 && table && <div className="wizard-panel"><h3>3. Mapeamento e prévia</h3>{table.encoding !== 'XLSX' && <div className="parser-controls"><label>Encoding<select value={encoding} onChange={(event) => { const value = event.target.value as FileEncoding; setEncoding(value); parseTextAgain(value, delimiter) }}><option>UTF-8</option><option>WINDOWS-1252</option></select></label><label>Delimitador<select value={delimiter} onChange={(event) => { const value = event.target.value as Delimiter; setDelimiter(value); parseTextAgain(encoding, value) }}><option value=";">Ponto e vírgula (;)</option><option value=",">Vírgula (,)</option><option value={'\t'}>Tabulação</option></select></label></div>}<div className="header-choice"><div><strong>Cabeçalho detectado:</strong> {table.suggestedHeaderMode === 'ABSENT' ? 'Provavelmente não possui cabeçalho' : table.suggestedHeaderMode === 'PRESENT' ? 'Provavelmente possui cabeçalho' : 'Detecção ambígua'} <Badge tone={table.headerConfidence === 'HIGH' ? 'success' : 'warning'}>{table.headerConfidence}</Badge></div><label>Cabeçalho do arquivo<select value={headerMode} onChange={(event) => void changeHeaderMode(event.target.value as HeaderMode)}><option value="AUTO">Detectar automaticamente</option><option value="PRESENT">Primeira linha é cabeçalho</option><option value="ABSENT">Arquivo não possui cabeçalho</option></select></label><div><strong>Opção selecionada:</strong> {headerMode === 'ABSENT' ? 'Arquivo não possui cabeçalho' : headerMode === 'PRESENT' ? 'Primeira linha é cabeçalho' : 'Detectar automaticamente'}</div><div><strong>Cabeçalho:</strong> {table.hasHeader ? 'Possui' : table.hasHeader === false ? 'Não possui' : 'Confirmação necessária'}</div></div><div className="table-wrap"><table><thead><tr><th>Posição / cabeçalho original</th><th>Mapear como</th><th>Unidade</th><th>Sugestão</th></tr></thead><tbody>{mappings.map((mapping) => <tr key={mapping.index}><td>{mapping.index} · <strong>{mapping.displayName}</strong><small className="cell-note">{mapping.headerOriginal ?? 'Sem cabeçalho original'}</small></td><td><select value={mapping.channelType} onChange={(event) => changeMapping(mapping.index, 'channelType', event.target.value)}>{channels.map((channel) => <option key={channel}>{channel}</option>)}</select></td><td>{!['IGNORE', 'TIMESTAMP'].includes(mapping.channelType) ? <select value={mapping.unit ?? ''} onChange={(event) => changeMapping(mapping.index, 'unit', event.target.value)}><option value="">Confirmar unidade</option><option value="mca">mca</option><option value="m3_h">m3_h</option><option value="l_s">l_s</option><option value="raw">raw</option></select> : '—'}</td><td><Badge tone={mapping.confidence === 'HIGH' ? 'success' : mapping.confidence === 'MEDIUM' ? 'warning' : 'neutral'}>{mapping.confidence}</Badge></td></tr>)}</tbody></table></div><h4>Primeiras {preview.length} linhas interpretadas</h4><div className="table-wrap preview-table"><table><thead><tr><th>Linha</th>{table.headers.map((header, index) => <th key={`${index}-${header}`}>{header}</th>)}</tr></thead><tbody>{preview.map((row, rowIndex) => <tr key={rowIndex}><td>{rowIndex + (table.hasHeader ? 2 : 1)}</td>{row.map((value, columnIndex) => { const mapping = mappings[columnIndex]; return <td key={columnIndex}><span>{value instanceof Date ? value.toISOString() : String(value ?? '')}</span>{mapping?.channelType === 'TIMESTAMP' && <small className="cell-note">{parseLocalTimestamp(value) ?? 'TIMESTAMP INVÁLIDO'}</small>}{mapping && !['IGNORE', 'TIMESTAMP'].includes(mapping.channelType) && <small className="cell-note">numérico: {String(parseLocaleNumber(value) ?? 'NULL/ERRO')}</small>}</td>})}</tr>)}</tbody></table></div>{!canPrevalidate && <div className="note" role="status"><strong>Para habilitar a pré-validação:</strong><ul>{readiness.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></div>}<div className="button-row"><button type="button" className="secondary-button" onClick={() => setStep(1)}>Voltar</button><button type="button" disabled={!canPrevalidate} onClick={runPrevalidation}>Pré-validar arquivo</button></div></div>}
         {step === 3 && validation && <div className="wizard-panel"><h3>4. Pré-validação</h3><ValidationSummary value={validation} file={file} hash={hash} /><div className="note">Nenhuma pressão foi classificada. Nenhum timestamp, gap ou zero foi inventado ou preenchido.</div><div className="button-row"><button type="button" className="secondary-button" onClick={() => setStep(2)}>Revisar mapeamento</button><button type="button" onClick={() => setStep(4)}>Continuar para confirmação</button></div></div>}
         {step === 4 && validation && <div className="wizard-panel"><h3>5. Confirmação final</h3><ValidationSummary value={validation} file={file} hash={hash} /><label className="confirmation-box"><input type="checkbox" required id="raw-confirm" /> Confirmo que revisei origem, mapeamento, unidades, timestamps, rejeições e contagem prevista.</label><button type="button" className="danger-confirm" onClick={() => { const checkbox = document.querySelector<HTMLInputElement>('#raw-confirm'); if (checkbox?.checked) void confirmImport(); else setError('Marque a confirmação de revisão antes de importar.') }}>Confirmar importação RAW</button></div>}
         {step === 5 && <div className="wizard-panel"><RefreshCw className="spin" /><h3>6. Processamento em lotes</h3><progress value={progress.processed} max={progress.total || 1} /><strong>{progress.processed.toLocaleString('pt-BR')} / {progress.total.toLocaleString('pt-BR')} medições processadas</strong><p className="desc">Interromper a sessão impede novos lotes, mas RAW já confirmado permanece imutável.</p></div>}
@@ -114,7 +143,7 @@ export function ImportacoesPage() {
 }
 
 function ValidationSummary({ value, file, hash }: { value: PrevalidationResult; file: File | null; hash: string }) {
-  const items = [['Arquivo', file?.name ?? '—'], ['SHA-256', `${hash.slice(0, 16)}…`], ['Linhas de origem', value.sourceRowCount], ['Timestamps válidos', value.validTimestampCount], ['Timestamps inválidos', value.invalidTimestampCount], ['Canais mapeados', value.mappedChannelCount], ['Medições RAW previstas', value.measurements.length], ['Valores válidos', value.validNumericCount], ['Nulos', value.nullValueCount], ['Erros numéricos', value.numericParseErrorCount], ['Duplicidades', value.duplicateCount], ['Cadência predominante', value.predominantCadenceMinutes ? `${value.predominantCadenceMinutes} min` : 'Não detectada'], ['Gaps', value.gapCount], ['Maior gap', value.largestGapMinutes ? `${value.largestGapMinutes} min` : '—'], ['Primeira leitura', value.firstReading ?? '—'], ['Última leitura', value.lastReading ?? '—']]
+  const items = [['Arquivo', file?.name ?? '—'], ['SHA-256', `${hash.slice(0, 16)}…`], ['Linhas físicas', value.physicalRowCount], ['Linhas de dados', value.sourceRowCount], ['Timestamps válidos', value.validTimestampCount], ['Timestamps inválidos', value.invalidTimestampCount], ['Canais mapeados', value.mappedChannelCount], ['Medições RAW previstas', value.measurements.length], ['Valores válidos', value.validNumericCount], ['Nulos', value.nullValueCount], ['Erros numéricos', value.numericParseErrorCount], ['Duplicidades', value.duplicateCount], ['Cadência predominante', value.predominantCadenceMinutes ? `${value.predominantCadenceMinutes} min` : 'Não detectada'], ['Gaps', value.gapCount], ['Maior gap', value.largestGapMinutes ? `${value.largestGapMinutes} min` : '—'], ['Primeira leitura', value.firstReading ?? '—'], ['Última leitura', value.lastReading ?? '—']]
   return <dl className="validation-grid">{items.map(([label, content]) => <div key={label}><dt>{label}</dt><dd>{content}</dd></div>)}</dl>
 }
 

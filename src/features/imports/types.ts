@@ -2,13 +2,15 @@ import type { DmcRow, SupplyGroup } from '../../types/database.types'
 
 export type FileEncoding = 'UTF-8' | 'WINDOWS-1252'
 export type Delimiter = ';' | ',' | '\t'
+export type HeaderMode = 'AUTO' | 'PRESENT' | 'ABSENT'
 export type ImportSource = { type: 'DMC'; dmc: DmcRow } | { type: 'SUPPLY_OUTLET'; supplyGroup: SupplyGroup }
 export type ImportChannel = 'IGNORE' | 'TIMESTAMP' | 'PRESSURE_PC' | 'PRESSURE_UPSTREAM' | 'PRESSURE_DOWNSTREAM' | 'PRESSURE_SUPPLY' | 'FLOW' | 'OTHER'
 export type RawChannel = Exclude<ImportChannel, 'IGNORE' | 'TIMESTAMP'>
 
 export interface ColumnMapping {
   index: number
-  headerOriginal: string
+  headerOriginal: string | null
+  displayName: string
   headerNormalized: string
   channelType: ImportChannel
   unit: string | null
@@ -20,6 +22,10 @@ export interface ParsedTable {
   rows: unknown[][]
   encoding: FileEncoding | 'XLSX'
   delimiter: Delimiter | null
+  hasHeader: boolean | null
+  physicalRowCount: number
+  suggestedHeaderMode: Exclude<HeaderMode, 'AUTO'> | null
+  headerConfidence: 'HIGH' | 'LOW'
 }
 
 export interface PreparedMeasurement {
@@ -53,6 +59,7 @@ export interface PrevalidationResult {
   rejectedRows: RejectedRow[]
   flags: ObjectiveFlag[]
   sourceRowCount: number
+  physicalRowCount: number
   validTimestampCount: number
   invalidTimestampCount: number
   mappedChannelCount: number
