@@ -23,8 +23,32 @@ Sanity checks aprovados: primeira leitura 01/11/2025 00:00 = 25,00 mca; segunda 
 
 A idempotência encontrou exatamente um import para o mesmo hash/origem/contexto, sem segunda confirmação ou duplicação. UPDATE e DELETE de RAW foram bloqueados no teste transacional de RLS. O arquivo original permanece no bucket privado `hydraulic-imports`; nenhum expurgo ou resultado CPE/IAL/IPS foi criado.
 
-## Preparação do PILOTO 02 — VAZÃO REDE
+## PILOTO 02 — VAZÃO REDE
 
-Antes da importação, a normalização foi corrigida por migration aditiva. **Unidade canônica normalizada de vazão do Performance Praia Grande: L/s.** FLOW em `m3_h` é dividido por 3,6; FLOW em `l_s` permanece inalterado. A view `validated_measurements` nunca modifica RAW e não inventa conversão para unidade incompatível.
+- Arquivo: `vazao rede.csv`
+- SHA-256 abreviado: `6d95f51adeeded2d…`
+- Import ID: `f32677a9-dbb1-434e-8db1-d25f6f524f91`
+- Status: `COMPLETED`
+- Origem: `SUPPLY_OUTLET / REDE`, sem DMC
+- Cabeçalho: não possui (`has_header = false`, confiança alta)
+- Encoding/delimitador: UTF-8 / `;`
+- Timezone: `America/Sao_Paulo`
+- Mapeamento: Coluna 1 = `TIMESTAMP`; Coluna 2 = `FLOW`, `m3_h`; Coluna 3 vazia = `IGNORE`
+- Período: 01/11/2025 00:00 a 31/08/2026 23:45
+- Linhas físicas/dados/RAW: 28.546 / 28.546 / 28.546
+- Rejeições: 0
+- Flags: 2 (`MISSING_TIMESTAMP`: 1; `ZERO_STREAK`: 1; demais: 0)
+- Gap: 1; 06/03/2026 18:00 a 13/03/2026 09:45; 9.585 minutos; 638 timestamps esperados ausentes
+- Duplicidades/nulos/erros numéricos: 0 / 0 / 0
+- Mínimo/máximo RAW: 0,00 / 5.854,04 m³/h
+- Unidade RAW: `m3_h`
+- Unidade normalizada: `l_s`
+- Fórmula: `normalized_value = raw_value / 3,6`
 
-Pré-validação repetida sem upload: `vazao rede.csv`, SHA-256 `6d95f51adeeded2d…`, sem cabeçalho (confiança alta), UTF-8, delimitador `;`, período local de 01/11/2025 00:00 a 31/08/2026 23:45, 28.546 linhas físicas, 28.546 timestamps válidos, nenhuma rejeição, duplicidade, nulidade ou erro numérico, 1 gap e 28.546 RAW previstos. Origem prevista: `SUPPLY_OUTLET / REDE`, sem DMC; canal `FLOW`; RAW `m3_h`; normalizado `l_s`. A importação permanece não confirmada.
+A normalização foi confirmada em todas as 28.546 leituras, com erro numérico máximo zero na comparação SQL. O RAW permaneceu em m³/h. Exemplos persistidos: 2.075,05 → 576,402777778 L/s; 1.956,66 → 543,516666667 L/s; 796,51 → 221,252777778 L/s; 2.326,45 → 646,236111111 L/s; 3.333,47 → 925,963888889 L/s; 1.378,06 → 382,794444444 L/s.
+
+O `ZERO_STREAK` representa 13 leituras zero, permanece WARNING para revisão e não invalida o RAW. Não houve `SENSOR_FAILURE`, indisponibilidade de equipamento ou expurgo. O arquivo original, com 851.612 bytes e MIME `text/csv`, foi preservado no bucket privado `hydraulic-imports` sem upsert.
+
+No cruzamento exploratório não persistente com `PRESSURE_SUPPLY / REDE`, foram encontrados 27.021 timestamps coincidentes: 92,5884% sobre a união das séries, 97,6933% da série de pressão e 94,6577% da série de vazão. Há 638 timestamps somente com pressão e 1.525 somente com vazão. A pressão possui 26 gaps e a vazão 1 gap. Nenhum `analysis_run`, CPE, IAL, IPS ou classificação causal foi criado.
+
+A idempotência reconheceu exatamente um import para o mesmo hash/origem/REDE e uma tentativa transacional duplicada foi bloqueada sem criar terceiro import. UPDATE e DELETE do RAW deste piloto foram igualmente bloqueados em transação com rollback. Status final: concluído e validado.
