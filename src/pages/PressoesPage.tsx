@@ -7,14 +7,13 @@ import { MockNotice } from '../components/ui/MockNotice'
 import { PageHeading } from '../components/ui/PageHeading'
 import { dmcsMock } from '../data/mock/dmcs.mock'
 import { useAuth } from '../features/auth/useAuth'
-import { useDmcSeries, useDmcs, useHydraulicOverview, useSupplySeries } from '../hooks/useReferenceData'
+import { useDmcs, useHydraulicOverview, useSupplySeries } from '../hooks/useReferenceData'
 
 export function PressoesPage() {
   const [supply, setSupply] = useState<'TODAS' | 'REDE' | 'XIXOVA'>('TODAS')
   const { isMockMode } = useAuth()
   const official = useDmcs()
   const supplySeries = useSupplySeries()
-  const dmcSeries = useDmcSeries()
   const diagnostics = useHydraulicOverview()
   const dmcs = useMemo(() => isMockMode ? (supply === 'TODAS' ? dmcsMock : dmcsMock.filter((dmc) => dmc.supply === supply)) : [], [isMockMode, supply])
   const officialDmcs = useMemo(() => supply === 'TODAS' ? official.data : official.data.filter((dmc) => dmc.supply_group === supply), [official.data, supply])
@@ -31,7 +30,7 @@ export function PressoesPage() {
       <p className="desc section-footnote">A correlação do detalhe é exploratória; não representa causalidade, CPE, IAL ou IPS.</p>
     </Card>}
     <div className="supply-summary"><button className={supply === 'TODAS' ? 'active' : ''} onClick={() => setSupply('TODAS')}>Todos <small>14 DMCs</small></button><button className={supply === 'REDE' ? 'active' : ''} onClick={() => setSupply('REDE')}>REDE <small>8 DMCs</small></button><button className={supply === 'XIXOVA' ? 'active' : ''} onClick={() => setSupply('XIXOVA')}>Xixová <small>6 DMCs</small></button></div>
-    {!isMockMode && (officialState.loading || officialState.error) ? <DataState loading={officialState.loading} error={officialState.error} empty="Nenhum DMC cadastrado" /> : <div className="dmc-grid">{isMockMode ? dmcs.map((dmc) => <DmcCard key={dmc.name} dmc={dmc} />) : officialDmcs.map((dmc) => <OfficialDmcCard key={dmc.id} dmc={dmc} series={dmcSeries.data.filter((series) => series.dmcId === dmc.id)} diagnostic={diagnostics.data.find((item) => item.dmc_id === dmc.id)} />)}</div>}
+    {!isMockMode && (officialState.loading || officialState.error) ? <DataState loading={officialState.loading} error={officialState.error} empty="Nenhum DMC cadastrado" /> : <div className="dmc-grid">{isMockMode ? dmcs.map((dmc) => <DmcCard key={dmc.name} dmc={dmc} />) : officialDmcs.map((dmc) => <OfficialDmcCard key={dmc.id} dmc={dmc} diagnostic={diagnostics.data.find((item) => item.dmc_id === dmc.id)} />)}</div>}
   </>
 }
 
