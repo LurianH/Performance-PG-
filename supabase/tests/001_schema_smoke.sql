@@ -197,24 +197,15 @@ values
   );
 
 select pg_temp.assert_true(
-  (select vp = 30 and reduction is null and attainment_pct is null
+  (select vp = 30 and reduction = 1969904 and attainment_pct is not null
    from public.performance_months_derived where id = '60000000-0000-0000-0000-000000000001'),
-  'VP should derive from VD/VCM while missing baseline/target stay NULL'
-);
-
-insert into public.performance_contract_parameters (
-  id, parameter_key, numeric_value, effective_from, effective_to, notes, created_by
-)
-values (
-  '70000000-0000-0000-0000-000000000001',
-  'VP_BASELINE', 100, '2026-02-01', '2026-02-28', 'fixture baseline',
-  '00000000-0000-0000-0000-00000000a001'
+  'VP, reduction and attainment should use the official active contract parameters'
 );
 
 select pg_temp.assert_true(
-  (select vp = 40 and reduction = 60 and attainment_pct is null
+  (select vp = 40 and reduction = 1969894 and attainment_pct is not null
    from public.performance_months_derived where id = '60000000-0000-0000-0000-000000000002'),
-  'baseline may derive reduction, but missing target must keep attainment NULL'
+  'official baseline and target should also apply to the following competence'
 );
 
 do $$

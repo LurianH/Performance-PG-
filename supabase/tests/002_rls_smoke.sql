@@ -57,7 +57,11 @@ reset role;
 -- LEITURA: consulta permitida; mutacao e autopromocao negadas.
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000b003","role":"authenticated"}', true);
-select pg_temp.assert_true((select count(*) = 1 from public.dmcs), 'LEITURA should read operational data');
+select pg_temp.assert_true(
+  exists (select 1 from public.dmcs where id = '11000000-0000-0000-0000-000000000001')
+  and (select count(*) = 15 from public.dmcs),
+  'LEITURA should read the 14 official DMCs and the transactional fixture'
+);
 do $$
 begin
   begin

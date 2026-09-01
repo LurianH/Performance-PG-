@@ -3,6 +3,9 @@ import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { MockNotice } from '../components/ui/MockNotice'
 import { PageHeading } from '../components/ui/PageHeading'
+import { useAuth } from '../features/auth/useAuth'
+import { useReferenceCounts } from '../hooks/useReferenceData'
+import { DataState } from '../components/ui/DataState'
 
 const checks = [
   [TimerOff, 'Gaps de telemetria', 'Aguardando importação', 'Timestamps ausentes não serão interpolados automaticamente.'],
@@ -13,10 +16,13 @@ const checks = [
 ] as const
 
 export function QualidadePage() {
+  const { isMockMode } = useAuth()
+  const counts = useReferenceCounts()
   return (
     <>
       <PageHeading title="Qualidade dos dados" description="Arquitetura preparada para importações, RAW imutável, validação derivada e expurgos reversíveis." action={<button className="secondary-button inline-button" disabled><UploadCloud size={16} /> Nova importação</button>} />
-      <MockNotice>nenhum arquivo foi importado e nenhum contador foi inventado nesta etapa.</MockNotice>
+      {isMockMode && <MockNotice>nenhum arquivo foi importado e nenhum contador foi inventado nesta etapa.</MockNotice>}
+      {!isMockMode && (counts.loading || counts.error) ? <DataState loading={counts.loading} error={counts.error} empty="" /> : !isMockMode && <div className="kpi-grid"><Card><span className="kpi-label">Importações</span><strong className="kpi-value">{counts.data.imports}</strong></Card><Card><span className="kpi-label">Registros RAW</span><strong className="kpi-value">{counts.data.raw}</strong></Card><Card><span className="kpi-label">Expurgos</span><strong className="kpi-value">{counts.data.exclusions}</strong></Card></div>}
       <div className="quality-grid">{checks.map(([Icon, title, status, text]) => <Card key={title}><Icon className="info-text" /><h3>{title}</h3><strong className="quality-status">{status}</strong><p className="desc">{text}</p></Card>)}</div>
       <div className="grid-main">
         <Card><h3>Importações</h3><div className="table-wrap"><table><thead><tr><th>Arquivo</th><th>Origem</th><th>Status</th><th>Linhas</th></tr></thead><tbody><tr><td colSpan={4}><div className="table-empty">Nenhuma importação registrada</div></td></tr></tbody></table></div><p className="desc section-footnote">Hash do arquivo garantirá detecção de repetição e idempotência.</p></Card>

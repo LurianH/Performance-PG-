@@ -73,3 +73,25 @@ export interface PerformanceContractParameterRow {
   created_by: string | null
   created_at: string
 }
+
+export interface TechnicalParameterRow {
+  id: string
+  key: string
+  numeric_value: number | null
+  text_value: string | null
+  json_value: unknown | null
+  effective_from: string
+  effective_to: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface ReferenceCounts {
+  imports: number
+  raw: number
+  exclusions: number
+  performanceMonths: number
+  projectionScenarios: number
+  equipmentPeriods: number
+}
